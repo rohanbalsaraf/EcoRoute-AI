@@ -17,8 +17,7 @@ COPY . .
 
 # 1. Build and install the Rust core engine into Python
 WORKDIR /app/packages/ecoroute-core
-RUN pip install --no-cache-dir maturin
-RUN maturin develop --release
+RUN pip install --no-cache-dir .
 
 # 2. Install Python API dependencies
 WORKDIR /app/packages/ecoroute-api

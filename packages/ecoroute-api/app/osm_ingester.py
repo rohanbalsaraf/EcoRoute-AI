@@ -17,8 +17,18 @@ def fetch_osm_data(bbox):
     >;
     out skel qt;
     """
-    response = requests.post(overpass_url, data={'data': overpass_query})
-    return response.json()
+    print(f"🔍 Querying Overpass with bbox: {bbox}")
+    response = requests.post(overpass_url, data={'data': overpass_query}, timeout=30)
+    if response.status_code != 200:
+        print(f"❌ Overpass API error {response.status_code}: {response.text}")
+        raise Exception(f"Overpass API returned status {response.status_code}")
+    
+    data = response.json()
+    if not data.get('elements'):
+        print("⚠️ No road data found in this area.")
+        raise Exception("No road data found in this area. Try a more populated location.")
+    
+    return data
 
 def process_osm_to_graph(osm_data):
     """

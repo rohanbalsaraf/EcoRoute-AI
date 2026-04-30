@@ -24,7 +24,7 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
         sources: {
           'raster-tiles': {
             type: 'raster',
-            tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'],
+            tiles: ['https://basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png'],
             tileSize: 256,
             attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
           }

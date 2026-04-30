@@ -4,7 +4,7 @@ import ecoroute_core
 import os
 from .osm_ingester import ingest_area
 
-GRAPH_FILE = "graph_cache.json"
+GRAPH_FILE = "/tmp/graph_cache.json"
 
 def get_graph_from_data(nodes, adjacency):
     return ecoroute_core.PyRoadGraph(

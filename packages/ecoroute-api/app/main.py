@@ -3,6 +3,7 @@ import hashlib
 import os
 import time
 import redis
+import json
 from fastapi import FastAPI, Depends, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from .auth import get_current_user, verify_api_key, UserSchema
 from .database import get_db
 from .models import User, Subscription
+from .graph_store import graph, init_graph
 
 app = FastAPI(
     title="EcoRoute API",
@@ -149,25 +151,46 @@ async def lemonsqueezy_webhook(
 
     return {"status": "success"}
 
+@app.on_event("startup")
+async def startup_event():
+    init_graph()
+
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the EcoRoute API"}
+    return {"message": "Welcome to the EcoRoute API", "version": "1.0.0"}
+
+from pydantic import BaseModel
+
+class RouteRequest(BaseModel):
+    origin_lat: float
+    origin_lon: float
+    dest_lat: float
+    dest_lon: float
+    vehicle: str = "petrol"
 
 @app.post("/v1/routes", dependencies=[Depends(rate_limit)])
-def calculate_route(origin: str, destination: str):
-    # This would call the ecoroute-core Rust library
-    return {
-        "origin": origin,
-        "destination": destination,
-        "routes": [
-            {
-                "type": "greenest",
-                "carbon_cost": 4.5,
-                "distance_km": 12.2,
-                "duration_min": 25
-            }
-        ]
-    }
+def calculate_route(request: RouteRequest):
+    if not graph:
+        raise HTTPException(status_code=503, detail="Routing engine not initialized")
+
+    try:
+        # 1. Map GPS coordinates to nearest graph nodes
+        start_node = graph.nearest_node(request.origin_lat, request.origin_lon)
+        end_node = graph.nearest_node(request.dest_lat, request.dest_lon)
+
+        # 2. Call the Rust engine
+        import ecoroute_core
+        routes_json = ecoroute_core.calculate_routes(graph, start_node, end_node, request.vehicle)
+        routes_data = json.loads(routes_json)
+
+        return {
+            "origin": {"lat": request.origin_lat, "lon": request.origin_lon, "node_id": start_node},
+            "destination": {"lat": request.dest_lat, "lon": request.dest_lon, "node_id": end_node},
+            "vehicle": request.vehicle,
+            "routes": routes_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/internal/dashboard/stats", dependencies=[Depends(get_current_user)])
 def get_dashboard_stats(user: UserSchema = Depends(get_current_user), db: Session = Depends(get_db)):

@@ -3,10 +3,12 @@
 // Core data structures: Node, Edge, RoadGraph, RouteResult
 // ================================================================
 
+use serde::{Serialize, Deserialize};
+
 // ----------------------------------------------------------------
 // Node — one intersection or point on the road network
 // ----------------------------------------------------------------
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     pub id:  usize,
     pub lat: f64,
@@ -16,7 +18,7 @@ pub struct Node {
 // ----------------------------------------------------------------
 // Edge — one road segment connecting two nodes
 // ----------------------------------------------------------------
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Edge {
     pub to:                usize,
     pub distance_km:       f64,
@@ -29,7 +31,7 @@ pub struct Edge {
 // ----------------------------------------------------------------
 // OptimizeFor — what weight the algorithm minimises
 // ----------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum OptimizeFor {
     Carbon,    // lowest CO2  — green route
     Time,      // lowest time — fastest route
@@ -85,7 +87,7 @@ impl RoadGraph {
 // ----------------------------------------------------------------
 // RouteResult — returned by the algorithm
 // ----------------------------------------------------------------
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouteResult {
     pub path:              Vec<usize>,
     pub total_carbon_kg:   f64,
@@ -117,7 +119,7 @@ impl RouteResult {
 // ----------------------------------------------------------------
 // AllRoutes — three-route comparison shown to users
 // ----------------------------------------------------------------
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AllRoutes {
     pub greenest: RouteResult,
     pub fastest:  RouteResult,

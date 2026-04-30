@@ -5,10 +5,12 @@
 
 use crate::graph::Edge;
 
+use serde::{Serialize, Deserialize};
+
 // ----------------------------------------------------------------
 // Vehicle — belongs to the traveller, not the road
 // ----------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Vehicle {
     Petrol,
     Diesel,

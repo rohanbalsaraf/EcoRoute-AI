@@ -54,29 +54,45 @@ export default function ComparePage() {
       }
 
       // 2. Call the real routing API
-      const origin = "San Francisco, CA"; // These would normally come from the search bar state
-      const destination = "Los Angeles, CA";
+      // Using hardcoded coordinates for Pune (from our dummy graph) for the playground demo
+      const params = new URLSearchParams({
+        origin_lat: "18.5285", 
+        origin_lon: "73.8740",
+        dest_lat: "18.5912",
+        dest_lon: "73.7380",
+        vehicle: "petrol"
+      });
       
-      const routeRes = await fetch(`${API_URL}/v1/routes?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`, {
+      const routeRes = await fetch(`${API_URL}/v1/routes`, {
         method: "POST",
-        headers: { "X-API-Key": apiKey }
+        body: JSON.stringify({
+          origin_lat: 18.5285, 
+          origin_lon: 73.8740,
+          dest_lat: 18.5912,
+          dest_lon: 73.7380,
+          vehicle: "petrol"
+        }),
+        headers: { 
+          "X-API-Key": apiKey,
+          "Content-Type": "application/json"
+        }
       });
 
       if (routeRes.ok) {
         const data = await routeRes.json();
-        const mainRoute = data.routes[0];
+        const routes = data.routes;
         
         setResults({
           eco: {
-            distance: `${mainRoute.distance_km} km`,
-            duration: `${mainRoute.duration_min} min`,
-            carbon: `${mainRoute.carbon_cost} kg`,
+            distance: `${routes.greenest.total_distance_km.toFixed(1)} km`,
+            duration: `${routes.greenest.total_time_min.toFixed(0)} min`,
+            carbon: `${routes.greenest.total_carbon_kg.toFixed(2)} kg`,
             isEco: true,
           },
           standard: {
-            distance: `${(mainRoute.distance_km * 0.9).toFixed(1)} km`,
-            duration: `${(mainRoute.duration_min * 0.8).toFixed(0)} min`,
-            carbon: `${(mainRoute.carbon_cost * 2.2).toFixed(1)} kg`,
+            distance: `${routes.fastest.total_distance_km.toFixed(1)} km`,
+            duration: `${routes.fastest.total_time_min.toFixed(0)} min`,
+            carbon: `${routes.fastest.total_carbon_kg.toFixed(2)} kg`,
             isEco: false,
           }
         });

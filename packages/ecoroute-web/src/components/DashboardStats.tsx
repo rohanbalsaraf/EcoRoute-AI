@@ -8,7 +8,8 @@ export default function DashboardStats() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_URL = rawApiUrl.replace(/\/$/, "");
 
   useEffect(() => {
     const fetchStats = async () => {

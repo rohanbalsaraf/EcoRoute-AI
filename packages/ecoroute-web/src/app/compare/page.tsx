@@ -13,7 +13,8 @@ export default function ComparePage() {
   const [results, setResults] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_URL = rawApiUrl.replace(/\/$/, "");
 
   const handleSearch = async () => {
     setIsSearching(true);

@@ -87,49 +87,49 @@ export default function ApiKeyManager() {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border md:col-span-2">
+    <div className="glass-panel p-4 md:col-span-2">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">API Keys</h2>
+        <h2 className="text-lg font-semibold text-white">API Keys</h2>
         <button 
           onClick={generateKey} 
           disabled={loading}
-          className="bg-black text-white px-4 py-2 rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50"
+          className="btn-primary text-xs"
         >
           {loading ? "Processing..." : "Generate New Key"}
         </button>
       </div>
-      <p className="text-sm text-gray-500 mb-4">Use these keys to authenticate your API requests.</p>
+      <p className="text-xs text-[var(--text-secondary)] mb-4">Use these keys to authenticate your API requests.</p>
       
       {newKey && (
-        <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded mb-4">
-          <p className="font-semibold text-sm mb-1">Success! Your new API key:</p>
+        <div className="bg-[rgba(0,255,163,0.1)] border border-[var(--neon-green)] p-3 rounded mb-4 animate-in fade-in zoom-in duration-300">
+          <p className="font-semibold text-xs text-[var(--neon-green)] mb-1.5 uppercase tracking-wider">Your new API key:</p>
           <div className="flex items-center gap-2">
-            <code className="bg-white px-2 py-1 rounded border text-sm flex-1">{newKey.raw}</code>
+            <code className="bg-[var(--surface)] px-2 py-1.5 rounded border border-[var(--border-subtle)] text-xs flex-1 font-mono text-white break-all">{newKey.raw}</code>
             <button 
               onClick={() => copyToClipboard(newKey.raw)}
-              className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+              className="btn-primary py-1.5 px-3 text-xs"
             >
               Copy
             </button>
           </div>
-          <p className="text-xs mt-2 opacity-80">Make sure to copy this now. You won't be able to see it again!</p>
+          <p className="text-[10px] mt-2 text-[var(--neon-green)] opacity-80">Make sure to copy this now. You won't be able to see it again!</p>
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {keys.length === 0 && !loading && (
-          <p className="text-gray-500 text-sm italic">No API keys found. Generate one to get started.</p>
+          <p className="text-[var(--text-secondary)] text-xs italic">No API keys found. Generate one to get started.</p>
         )}
         {keys.map((k) => (
-          <div key={k.id} className="bg-gray-50 p-4 rounded border border-gray-200">
+          <div key={k.id} className="bg-[var(--surface)] p-3 rounded border border-[var(--border-subtle)] hover:border-[var(--border-glow-green)] transition-all group">
             <div className="flex justify-between items-center">
               <div>
-                <p className="font-medium text-sm">{k.name}</p>
-                <p className="font-mono text-sm text-gray-500 mt-1">{k.display_key}</p>
-                <p className="text-xs text-gray-400 mt-1">Created: {new Date(k.created_at).toLocaleDateString()}</p>
+                <p className="font-medium text-sm text-white">{k.name}</p>
+                <p className="font-mono text-xs text-[var(--text-secondary)] mt-1">{k.display_key}</p>
+                <p className="text-[10px] text-gray-600 mt-1 uppercase tracking-tighter">Created: {new Date(k.created_at).toLocaleDateString()}</p>
               </div>
               <button 
-                className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                className="text-red-500 hover:text-red-400 text-xs font-medium transition-colors opacity-0 group-hover:opacity-100"
                 onClick={() => revokeKey(k.id)}
               >
                 Revoke

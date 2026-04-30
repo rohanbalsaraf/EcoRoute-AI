@@ -170,11 +170,15 @@ def get_dashboard_stats(user: UserSchema = Depends(get_current_user), db: Sessio
     """Internal endpoint used by the Next.js frontend to show user's API usage."""
     
     # For a real implementation, you might sum the usage directly from Redis
-    # e.g., get the key rate_limit:{user.id}:{current_day}
     current_day = int(time.time() // 86400)
     redis_key = f"rate_limit:{user.id}:{current_day}"
-    usage = redis_client.get(redis_key)
-    usage_count = int(usage) if usage else 0
+    
+    usage_count = 0
+    if redis_client:
+        usage = redis_client.get(redis_key)
+        usage_count = int(usage) if usage else 0
+    else:
+        usage_count = in_memory_rate_limit.get(redis_key, 0)
     
     # Get user's tier
     sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()

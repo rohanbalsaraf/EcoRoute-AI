@@ -13,22 +13,24 @@ export default async function DashboardPage() {
   const user = await currentUser();
 
   return (
-    <div className="max-w-6xl mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-8">Developer Dashboard</h1>
+    <div className="max-w-6xl mx-auto p-4 md:p-8">
+      <h1 className="text-2xl md:text-3xl font-extrabold mb-6 md:mb-8 text-white tracking-tight">Developer <span className="text-glow-green">Dashboard</span></h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         {/* Profile Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold mb-4">Profile</h2>
-          <p className="text-gray-600 truncate">Email: {user?.emailAddresses[0]?.emailAddress}</p>
-          <p className="text-gray-600 truncate">User ID: <span className="font-mono text-xs">{userId}</span></p>
+        <div className="glass-panel p-4 flex flex-col justify-center border-glow-hover">
+          <h2 className="text-lg font-semibold mb-3 text-white">Profile</h2>
+          <div className="space-y-1.5">
+            <p className="text-xs text-[var(--text-secondary)] truncate">Email: <span className="text-white font-medium">{user?.emailAddresses[0]?.emailAddress}</span></p>
+            <p className="text-xs text-[var(--text-secondary)] truncate">User ID: <span className="font-mono text-[10px] bg-[var(--surface)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-white">{userId}</span></p>
+          </div>
         </div>
 
         {/* API Keys Manager */}
         <ApiKeyManager />
 
         {/* Usage Analytics */}
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 mt-2">
           <DashboardStats />
         </div>
       </div>

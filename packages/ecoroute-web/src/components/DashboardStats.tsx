@@ -49,31 +49,31 @@ export default function DashboardStats() {
   const usagePercentage = Math.min(100, (stats.api_calls_this_month / stats.limit) * 100);
 
   return (
-    <div className="bg-white p-5 rounded-lg shadow-sm border md:col-span-3">
+    <div className="glass-panel p-4 md:col-span-3">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Usage & Billing</h2>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded ${stats.tier === "Pro" ? "bg-purple-100 text-purple-800" : "bg-green-100 text-green-800"}`}>
+        <h2 className="text-lg font-semibold text-white">Usage & Billing</h2>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${stats.tier === "Pro" ? "bg-[var(--neon-purple)] text-white" : "bg-[var(--neon-green)] text-black"}`}>
           {stats.tier} Tier
         </span>
       </div>
       
       <div className="mb-4">
-        <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-600 font-medium">API Calls (Today)</span>
-          <span className="text-gray-900 font-bold">{stats.api_calls_this_month} / {stats.limit}</span>
+        <div className="flex justify-between text-xs mb-1.5">
+          <span className="text-[var(--text-secondary)] font-medium">API Calls (Today)</span>
+          <span className="text-white font-bold">{stats.api_calls_this_month} / {stats.limit}</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
+        <div className="w-full bg-[var(--surface)] rounded-full h-1.5 relative overflow-hidden">
           <div 
-            className={`h-2.5 rounded-full ${usagePercentage > 90 ? "bg-red-600" : "bg-green-600"}`} 
+            className={`h-full rounded-full transition-all duration-500 ${usagePercentage > 90 ? "bg-red-500" : "bg-[var(--neon-green)] shadow-[0_0_8px_var(--neon-green-glow)]"}`} 
             style={{ width: `${usagePercentage}%` }}
           ></div>
         </div>
         {usagePercentage > 90 && (
-          <p className="text-xs text-red-600 mt-2">You are approaching your daily limit. Consider upgrading your tier.</p>
+          <p className="text-[10px] text-red-400 mt-2 font-medium">Approaching daily limit. Consider upgrading.</p>
         )}
       </div>
       
-      <div className="mt-6 flex justify-between items-center border-t pt-4">
+      <div className="mt-6 flex justify-between items-center border-t border-[var(--border-subtle)] pt-4">
         {stats.tier !== "Pro" ? (
           <button 
             onClick={async () => {
@@ -90,7 +90,7 @@ export default function DashboardStats() {
                 alert("Error connecting to checkout service.");
               }
             }}
-            className="text-white bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            className="btn-primary text-xs"
           >
             Upgrade to Pro
           </button>
@@ -101,9 +101,9 @@ export default function DashboardStats() {
           href="https://app.lemonsqueezy.com/my-orders"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:underline text-sm font-medium"
+          className="text-[var(--neon-green)] hover:underline text-xs font-medium"
         >
-          Manage Billing in Lemon Squeezy &rarr;
+          Manage Billing &rarr;
         </a>
       </div>
     </div>

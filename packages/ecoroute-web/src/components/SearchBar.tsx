@@ -1,18 +1,24 @@
+import { useState } from 'react';
+
 interface SearchBarProps {
-  onSearch: () => void;
+  onSearch: (origin: string, destination: string) => void;
   isLoading: boolean;
 }
 
 export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
+  const [origin, setOrigin] = useState('Pune Station, Pune');
+  const [destination, setDestination] = useState('Hinjewadi, Pune');
+
   return (
     <div className="glass-panel p-3 flex flex-col gap-3">
       <div className="relative">
         <div className="absolute left-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-400"></div>
         <input 
           type="text" 
-          placeholder="Origin (e.g., San Francisco, CA)" 
+          value={origin}
+          onChange={(e) => setOrigin(e.target.value)}
+          placeholder="Origin (e.g., Pune Station)" 
           className="w-full bg-[var(--surface)] text-sm border border-[var(--border-subtle)] text-white rounded-md pl-7 pr-3 py-2 focus:outline-none focus:border-[var(--neon-green)] focus:ring-1 focus:ring-[var(--neon-green)] transition-all"
-          defaultValue="San Francisco, CA"
         />
       </div>
       
@@ -26,15 +32,16 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
         <div className="absolute left-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-sm bg-red-500"></div>
         <input 
           type="text" 
-          placeholder="Destination (e.g., Los Angeles, CA)" 
+          value={destination}
+          onChange={(e) => setDestination(e.target.value)}
+          placeholder="Destination (e.g., Hinjewadi)" 
           className="w-full bg-[var(--surface)] text-sm border border-[var(--border-subtle)] text-white rounded-md pl-7 pr-3 py-2 focus:outline-none focus:border-[var(--neon-green)] focus:ring-1 focus:ring-[var(--neon-green)] transition-all"
-          defaultValue="Los Angeles, CA"
         />
       </div>
 
       <button 
-        onClick={onSearch}
-        disabled={isLoading}
+        onClick={() => onSearch(origin, destination)}
+        disabled={isLoading || !origin || !destination}
         className="btn-primary w-full mt-1 flex items-center justify-center gap-1.5 text-xs"
       >
         {isLoading ? (

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapViewProps {
   isActive: boolean;
@@ -12,28 +12,77 @@ interface MapViewProps {
 
 export default function MapView({ isActive, isSearching, routes }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<L.Map | null>(null);
-  const ecoLayer = useRef<L.Polyline | null>(null);
-  const stdLayer = useRef<L.Polyline | null>(null);
+  const map = useRef<maplibregl.Map | null>(null);
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
 
-    // Initialize Leaflet map
-    map.current = L.map(mapContainer.current, {
-      center: [18.5204, 73.8567], // Pune
+    map.current = new maplibregl.Map({
+      container: mapContainer.current,
+      style: {
+        version: 8,
+        sources: {
+          'raster-tiles': {
+            type: 'raster',
+            tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+            tileSize: 256,
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+          }
+        },
+        layers: [
+          {
+            id: 'simple-tiles',
+            type: 'raster',
+            source: 'raster-tiles',
+            minzoom: 0,
+            maxzoom: 22
+          }
+        ]
+      },
+      center: [73.8567, 18.5204], // Pune
       zoom: 12,
-      zoomControl: false,
       attributionControl: false
     });
 
-    // Add Premium Dark Tiles (Free, no key required)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19
-    }).addTo(map.current);
+    map.current.on('load', () => {
+      if (!map.current) return;
 
-    // Add a custom zoom control in a better position
-    L.control.zoom({ position: 'bottomright' }).addTo(map.current);
+      // Add sources for routes
+      map.current.addSource('eco-route', {
+        type: 'geojson',
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+      });
+
+      map.current.addLayer({
+        id: 'eco-route-line',
+        type: 'line',
+        source: 'eco-route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#00FFA3',
+          'line-width': 6,
+          'line-opacity': 0.8
+        }
+      });
+
+      map.current.addSource('std-route', {
+        type: 'geojson',
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+      });
+
+      map.current.addLayer({
+        id: 'std-route-line',
+        type: 'line',
+        source: 'std-route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#94A3B8',
+          'line-width': 4,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.5
+        }
+      });
+    });
 
     return () => {
       if (map.current) {
@@ -46,65 +95,35 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
   useEffect(() => {
     if (!map.current || !routes) return;
 
-    // Clear existing layers
-    if (ecoLayer.current) map.current.removeLayer(ecoLayer.current);
-    if (stdLayer.current) map.current.removeLayer(stdLayer.current);
+    const updateRoute = (type: string, sourceId: string) => {
+      if (!map.current || !routes[type] || !routes[type].path_coords) return null;
+      
+      const coords = routes[type].path_coords.map((p: any) => [p.lon, p.lat]);
+      const source = map.current.getSource(sourceId) as maplibregl.GeoJSONSource;
+      if (source) {
+        source.setData({
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates: coords }
+        });
+      }
+      return coords;
+    };
 
-    // Draw Standard Route (Dashed Gray)
-    if (routes.fastest && routes.fastest.path_coords) {
-      const stdPoints = routes.fastest.path_coords.map((p: any) => [p.lat, p.lon] as L.LatLngExpression);
-      stdLayer.current = L.polyline(stdPoints, {
-        color: '#64748B',
-        weight: 4,
-        dashArray: '8, 12',
-        opacity: 0.6
-      }).addTo(map.current);
-    }
+    const ecoCoords = updateRoute('greenest', 'eco-route');
+    updateRoute('fastest', 'std-route');
 
-    // Draw Eco Route (Solid Neon Green)
-    if (routes.greenest && routes.greenest.path_coords) {
-      const ecoPoints = routes.greenest.path_coords.map((p: any) => [p.lat, p.lon] as L.LatLngExpression);
-      ecoLayer.current = L.polyline(ecoPoints, {
-        color: '#00FFA3',
-        weight: 6,
-        opacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(map.current);
-
-      // Add simple circles as markers for start and end
-      const start = ecoPoints[0];
-      const end = ecoPoints[ecoPoints.length - 1];
-
-      L.circleMarker(start, {
-        radius: 8,
-        fillColor: '#FFFFFF',
-        color: '#94A3B8',
-        weight: 2,
-        fillOpacity: 1
-      }).addTo(map.current);
-
-      L.circleMarker(end, {
-        radius: 8,
-        fillColor: '#00FFA3',
-        color: '#000000',
-        weight: 2,
-        fillOpacity: 1
-      }).addTo(map.current);
-
-      // Fit bounds to the eco route
-      map.current.fitBounds(ecoLayer.current.getBounds(), {
-        padding: [50, 50],
-        animate: true,
-        duration: 1.5
-      });
+    if (ecoCoords && ecoCoords.length > 0) {
+      const bounds = new maplibregl.LngLatBounds();
+      ecoCoords.forEach((c: any) => bounds.extend(c as [number, number]));
+      map.current.fitBounds(bounds, { padding: 50, duration: 2000 });
     }
   }, [routes]);
 
   return (
-    <div className="w-full h-full relative bg-[#0A0B10]">
-      <div ref={mapContainer} className="absolute inset-0 z-0" />
-
+    <div className="w-full h-full relative">
+      <div ref={mapContainer} className="absolute inset-0" />
+      
       {isSearching && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[var(--surface-glass)] backdrop-blur-sm">
           <div className="w-16 h-16 rounded-full border-4 border-[var(--border-subtle)] border-t-[var(--neon-green)] animate-spin"></div>
@@ -112,19 +131,9 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
         </div>
       )}
 
-      {/* Origin/Dest Indicators */}
       <div className="absolute bottom-4 left-4 z-10 glass-panel p-2 px-3 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest border border-white/5">
-        Live Routing Engine • OpenStreetMap Data
+        Live Routing Engine • MapLibre GL
       </div>
-
-      <style jsx global>{`
-        .leaflet-container {
-          background: #0A0B10 !important;
-        }
-        .leaflet-tile-pane {
-          opacity: 0.9;
-        }
-      `}</style>
     </div>
   );
 }

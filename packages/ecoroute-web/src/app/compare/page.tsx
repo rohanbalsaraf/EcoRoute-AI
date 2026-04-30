@@ -16,12 +16,25 @@ export default function ComparePage() {
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const API_URL = rawApiUrl.replace(/\/$/, "");
 
-  const handleSearch = async () => {
+  const handleSearch = async (originStr: string, destinationStr: string) => {
     setIsSearching(true);
     setError(null);
     
     try {
       const token = await getToken();
+
+      // 1. Geocode locations
+      const geocode = async (query: string) => {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+        const data = await res.json();
+        if (data.length === 0) throw new Error(`Location not found: ${query}`);
+        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+      };
+
+      const [origin, dest] = await Promise.all([
+        geocode(originStr),
+        geocode(destinationStr)
+      ]);
       
       // 1. Get an API key to use for this request (Playground usually needs an API key)
       // For simplicity in the playground, we'll fetch the user's keys first
@@ -54,22 +67,13 @@ export default function ComparePage() {
       }
 
       // 2. Call the real routing API
-      // Using hardcoded coordinates for Pune (from our dummy graph) for the playground demo
-      const params = new URLSearchParams({
-        origin_lat: "18.5285", 
-        origin_lon: "73.8740",
-        dest_lat: "18.5912",
-        dest_lon: "73.7380",
-        vehicle: "petrol"
-      });
-      
       const routeRes = await fetch(`${API_URL}/v1/routes`, {
         method: "POST",
         body: JSON.stringify({
-          origin_lat: 18.5285, 
-          origin_lon: 73.8740,
-          dest_lat: 18.5912,
-          dest_lon: 73.7380,
+          origin_lat: origin.lat, 
+          origin_lon: origin.lon,
+          dest_lat: dest.lat, 
+          dest_lon: dest.lon,
           vehicle: "petrol"
         }),
         headers: { 

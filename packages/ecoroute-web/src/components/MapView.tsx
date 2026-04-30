@@ -104,7 +104,7 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
   return (
     <div className="w-full h-full relative bg-[#0A0B10]">
       <div ref={mapContainer} className="absolute inset-0 z-0" />
-      
+
       {isSearching && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[var(--surface-glass)] backdrop-blur-sm">
           <div className="w-16 h-16 rounded-full border-4 border-[var(--border-subtle)] border-t-[var(--neon-green)] animate-spin"></div>
@@ -126,6 +126,5 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
         }
       `}</style>
     </div>
-  );
   );
 }

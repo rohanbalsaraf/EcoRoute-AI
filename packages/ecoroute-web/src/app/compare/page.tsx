@@ -12,6 +12,8 @@ export default function ComparePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [originCoords, setOriginCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [destCoords, setDestCoords] = useState<{ lat: number; lon: number } | null>(null);
 
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const API_URL = rawApiUrl.replace(/\/$/, "");
@@ -35,6 +37,9 @@ export default function ComparePage() {
         geocode(originStr),
         geocode(destinationStr)
       ]);
+
+      setOriginCoords(origin);
+      setDestCoords(dest);
       
       // 1. Get an API key to use for this request (Playground usually needs an API key)
       // For simplicity in the playground, we'll fetch the user's keys first
@@ -157,7 +162,9 @@ export default function ComparePage() {
           <MapView 
             isActive={!!results} 
             isSearching={isSearching} 
-            routes={results?.raw} 
+            routes={results?.raw}
+            originCoords={originCoords}
+            destCoords={destCoords}
           />
         </div>
       </div>

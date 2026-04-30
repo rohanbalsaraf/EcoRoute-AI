@@ -1,4 +1,4 @@
-import { createCheckout, lemonsqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";
+import { createCheckout, lemonSqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
@@ -10,9 +10,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    lemonsqueezySetup({
+    lemonSqueezySetup({
       apiKey: process.env.LEMONSQUEEZY_API_KEY!,
-      onError: (error) => console.error("Lemon Squeezy Error:", error),
+      onError: (error: Error) => console.error("Lemon Squeezy Error:", error),
     });
 
     const storeId = process.env.LEMONSQUEEZY_STORE_ID;

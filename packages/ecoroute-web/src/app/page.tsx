@@ -28,14 +28,12 @@ export default async function Home() {
           >
             Start Building for Free
           </Link>
-          <a 
-            href="https://github.com/your-username/ecoroute" 
-            target="_blank" 
-            rel="noopener noreferrer"
+          <Link 
+            href="/pricing" 
             className="rounded-md bg-white px-6 py-3 text-lg font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
           >
-            View Documentation
-          </a>
+            View Pricing
+          </Link>
         </div>
 
         <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-3 text-left">

@@ -73,13 +73,38 @@ export default function DashboardStats() {
         )}
       </div>
       
-      <div className="mt-6 flex justify-end border-t pt-4">
-        <button 
-          onClick={() => alert("Redirecting to Lemon Squeezy Customer Portal...")}
+      <div className="mt-6 flex justify-between items-center border-t pt-4">
+        {stats.tier !== "Pro" ? (
+          <button 
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/checkout", { method: "POST" });
+                const data = await res.json();
+                if (data.url) {
+                  window.location.href = data.url;
+                } else {
+                  alert("Failed to initiate checkout: " + (data.error || "Unknown error"));
+                }
+              } catch (e) {
+                console.error(e);
+                alert("Error connecting to checkout service.");
+              }
+            }}
+            className="text-white bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          >
+            Upgrade to Pro
+          </button>
+        ) : (
+          <div></div> // Spacer
+        )}
+        <a 
+          href="https://app.lemonsqueezy.com/my-orders"
+          target="_blank"
+          rel="noopener noreferrer"
           className="text-blue-600 hover:underline text-sm font-medium"
         >
           Manage Billing in Lemon Squeezy &rarr;
-        </button>
+        </a>
       </div>
     </div>
   );

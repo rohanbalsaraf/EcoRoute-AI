@@ -19,7 +19,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict to frontend domain
+    allow_origins=[
+        "http://localhost:3000",
+        "https://eco-route-ai-amber.vercel.app",
+        "https://ecoroute.example.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

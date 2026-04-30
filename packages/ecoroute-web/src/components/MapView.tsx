@@ -7,39 +7,16 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 interface MapViewProps {
   isActive: boolean;
   isSearching: boolean;
-  routes?: any;
+  routeGeometries?: { eco: [number, number][]; standard: [number, number][] } | null;
   originCoords?: { lat: number; lon: number } | null;
   destCoords?: { lat: number; lon: number } | null;
 }
 
-async function fetchRoadGeometry(coords: [number, number][]): Promise<[number, number][]> {
-  // Use OSRM demo server for road-snapped geometry
-  // coords = array of [lon, lat]
-  if (coords.length < 2) return coords;
-
-  const start = coords[0];
-  const end = coords[coords.length - 1];
-
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-      return data.routes[0].geometry.coordinates;
-    }
-  } catch (e) {
-    console.warn('OSRM fallback to straight lines:', e);
-  }
-
-  // Fallback: return original straight-line coords
-  return coords;
-}
-
-export default function MapView({ isActive, isSearching, routes, originCoords, destCoords }: MapViewProps) {
+export default function MapView({ isActive, isSearching, routeGeometries, originCoords, destCoords }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<{ origin: maplibregl.Marker | null; dest: maplibregl.Marker | null }>({ origin: null, dest: null });
+  const mapReady = useRef(false);
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
@@ -49,25 +26,27 @@ export default function MapView({ isActive, isSearching, routes, originCoords, d
       style: {
         version: 8,
         sources: {
-          'raster-tiles': {
+          'osm-tiles': {
             type: 'raster',
-            tiles: ['https://basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png'],
+            tiles: [
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ],
             tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           }
         },
         layers: [
           {
-            id: 'simple-tiles',
+            id: 'osm-tiles',
             type: 'raster',
-            source: 'raster-tiles',
+            source: 'osm-tiles',
             minzoom: 0,
-            maxzoom: 22
+            maxzoom: 19
           }
         ]
       },
-      center: [73.8567, 18.5204],
-      zoom: 12,
+      center: [0, 20],
+      zoom: 2,
       attributionControl: false
     });
 
@@ -78,8 +57,9 @@ export default function MapView({ isActive, isSearching, routes, originCoords, d
 
     map.current.on('load', () => {
       if (!map.current) return;
+      mapReady.current = true;
 
-      // Eco route — road-snapped
+      // Eco route with glow
       map.current.addSource('eco-route', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
@@ -89,7 +69,7 @@ export default function MapView({ isActive, isSearching, routes, originCoords, d
         type: 'line',
         source: 'eco-route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#00FFA3', 'line-width': 12, 'line-opacity': 0.15, 'line-blur': 6 }
+        paint: { 'line-color': '#00FFA3', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
       });
       map.current.addLayer({
         id: 'eco-route-line',
@@ -99,7 +79,7 @@ export default function MapView({ isActive, isSearching, routes, originCoords, d
         paint: { 'line-color': '#00FFA3', 'line-width': 5, 'line-opacity': 0.9 }
       });
 
-      // Standard route — road-snapped
+      // Standard route
       map.current.addSource('std-route', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
@@ -109,18 +89,17 @@ export default function MapView({ isActive, isSearching, routes, originCoords, d
         type: 'line',
         source: 'std-route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#F97316', 'line-width': 4, 'line-dasharray': [2, 2], 'line-opacity': 0.6 }
+        paint: { 'line-color': '#F97316', 'line-width': 4, 'line-dasharray': [2, 2], 'line-opacity': 0.7 }
       });
 
-      // Origin marker
-      const elOrigin = document.createElement('div');
-      elOrigin.innerHTML = `<div style="width:20px;height:20px;border-radius:50%;background:white;border:3px solid #3B82F6;box-shadow:0 0 10px rgba(59,130,246,0.5);"></div>`;
-      markersRef.current.origin = new maplibregl.Marker({ element: elOrigin, anchor: 'center' });
+      // Create markers
+      const originEl = document.createElement('div');
+      originEl.innerHTML = '<div style="width:16px;height:16px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 0 8px rgba(59,130,246,0.6);"></div>';
+      markersRef.current.origin = new maplibregl.Marker({ element: originEl, anchor: 'center' });
 
-      // Dest marker
-      const elDest = document.createElement('div');
-      elDest.innerHTML = `<div style="width:20px;height:20px;border-radius:50%;background:#00FFA3;border:3px solid #000;box-shadow:0 0 10px rgba(0,255,163,0.5);"></div>`;
-      markersRef.current.dest = new maplibregl.Marker({ element: elDest, anchor: 'center' });
+      const destEl = document.createElement('div');
+      destEl.innerHTML = '<div style="width:16px;height:16px;border-radius:50%;background:#00FFA3;border:3px solid white;box-shadow:0 0 8px rgba(0,255,163,0.6);"></div>';
+      markersRef.current.dest = new maplibregl.Marker({ element: destEl, anchor: 'center' });
     });
 
     return () => {
@@ -128,69 +107,67 @@ export default function MapView({ isActive, isSearching, routes, originCoords, d
       if (map.current) {
         map.current.remove();
         map.current = null;
+        mapReady.current = false;
       }
     };
   }, []);
 
+  // Render routes when geometry arrives
   useEffect(() => {
-    if (!map.current || !routes) return;
+    if (!map.current || !mapReady.current || !routeGeometries) return;
 
-    const renderRoutes = async () => {
-      if (!map.current) return;
+    // Update eco route
+    const ecoSource = map.current.getSource('eco-route') as maplibregl.GeoJSONSource;
+    if (ecoSource && routeGeometries.eco.length > 0) {
+      ecoSource.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: routeGeometries.eco }
+      });
+    }
 
-      // Get the first and last coordinates for each route type
-      for (const [type, sourceId] of [['greenest', 'eco-route'], ['fastest', 'std-route']] as const) {
-        if (!routes[type] || !routes[type].path_coords || routes[type].path_coords.length < 2) continue;
+    // Update standard route
+    const stdSource = map.current.getSource('std-route') as maplibregl.GeoJSONSource;
+    if (stdSource && routeGeometries.standard.length > 0) {
+      stdSource.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: routeGeometries.standard }
+      });
+    }
 
-        const pathCoords = routes[type].path_coords;
-        const rawCoords: [number, number][] = pathCoords.map((p: any) => [p.lon, p.lat]);
+    // Fit bounds
+    if (originCoords && destCoords) {
+      const bounds = new maplibregl.LngLatBounds();
+      
+      // Use all route points for accurate bounds
+      routeGeometries.eco.forEach(c => bounds.extend(c as [number, number]));
+      
+      map.current.fitBounds(bounds, { padding: 60, duration: 1500 });
 
-        // Fetch real road geometry from OSRM
-        const roadCoords = await fetchRoadGeometry(rawCoords);
-
-        const source = map.current?.getSource(sourceId) as maplibregl.GeoJSONSource;
-        if (source) {
-          source.setData({
-            type: 'Feature',
-            properties: {},
-            geometry: { type: 'LineString', coordinates: roadCoords }
-          });
-        }
+      // Place markers
+      if (markersRef.current.origin) {
+        markersRef.current.origin.setLngLat([originCoords.lon, originCoords.lat]).addTo(map.current!);
       }
-
-      // Fit bounds to the eco route
-      if (routes.greenest?.path_coords?.length > 0 && originCoords && destCoords) {
-        const bounds = new maplibregl.LngLatBounds();
-        bounds.extend([originCoords.lon, originCoords.lat]);
-        bounds.extend([destCoords.lon, destCoords.lat]);
-        map.current?.fitBounds(bounds, { padding: 80, duration: 2000 });
-
-        // Update markers
-        if (markersRef.current.origin && map.current) {
-          markersRef.current.origin.setLngLat([originCoords.lon, originCoords.lat]).addTo(map.current);
-        }
-        if (markersRef.current.dest && map.current) {
-          markersRef.current.dest.setLngLat([destCoords.lon, destCoords.lat]).addTo(map.current);
-        }
+      if (markersRef.current.dest) {
+        markersRef.current.dest.setLngLat([destCoords.lon, destCoords.lat]).addTo(map.current!);
       }
-    };
-
-    renderRoutes();
-  }, [routes, originCoords, destCoords]);
+    }
+  }, [routeGeometries, originCoords, destCoords]);
 
   return (
     <div className="w-full h-full relative">
       <div ref={mapContainer} className="w-full h-full absolute inset-0" />
       
       {isSearching && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[var(--surface-glass)] backdrop-blur-sm">
-          <div className="w-16 h-16 rounded-full border-4 border-[var(--border-subtle)] border-t-[var(--neon-green)] animate-spin"></div>
-          <p className="mt-4 text-[var(--neon-green)] font-semibold tracking-wider text-sm animate-pulse">ANALYZING TOPOLOGY...</p>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-16 h-16 rounded-full border-4 border-gray-600 border-t-[#00FFA3] animate-spin"></div>
+          <p className="mt-4 text-[#00FFA3] font-semibold tracking-wider text-sm animate-pulse">CALCULATING ROUTES...</p>
         </div>
       )}
 
-      <div className="absolute bottom-4 left-4 z-10 glass-panel p-2 px-3 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest border border-white/5">
-        Live Routing Engine • MapLibre GL + OSRM
+      <div className="absolute bottom-3 left-3 z-10 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-md text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
+        EcoRoute • MapLibre GL + OSRM
       </div>
     </div>
   );

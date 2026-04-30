@@ -183,6 +183,15 @@ def calculate_route(request: RouteRequest):
         routes_json = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, request.vehicle)
         routes_data = json.loads(routes_json)
 
+        # 3. Hydrate path nodes with coordinates for mapping
+        def hydrate_path(node_ids):
+            return [{"lat": graph_store.graph.inner.nodes[nid].lat, 
+                     "lon": graph_store.graph.inner.nodes[nid].lon} for nid in node_ids]
+
+        for r_type in ["greenest", "fastest", "shortest"]:
+            if r_type in routes_data:
+                routes_data[r_type]["path_coords"] = hydrate_path(routes_data[r_type]["path"])
+
         return {
             "origin": {"lat": request.origin_lat, "lon": request.origin_lon, "node_id": start_node},
             "destination": {"lat": request.dest_lat, "lon": request.dest_lon, "node_id": end_node},

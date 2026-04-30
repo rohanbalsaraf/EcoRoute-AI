@@ -96,7 +96,8 @@ export default function ComparePage() {
             carbon: `${routes.fastest.total_carbon_kg.toFixed(2)} kg`,
             carbonVal: routes.fastest.total_carbon_kg,
             isEco: false,
-          }
+          },
+          raw: routes
         });
       } else {
         const errData = await routeRes.json();
@@ -149,7 +150,11 @@ export default function ComparePage() {
 
         {/* Right Map View */}
         <div className="w-full lg:w-2/3 h-[400px] lg:h-full rounded-xl overflow-hidden glass-panel relative border border-[var(--border-subtle)]">
-          <MapView isActive={!!results} isSearching={isSearching} />
+          <MapView 
+            isActive={!!results} 
+            isSearching={isSearching} 
+            routes={results?.raw} 
+          />
         </div>
       </div>
     </div>

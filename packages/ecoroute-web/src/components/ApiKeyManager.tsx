@@ -129,8 +129,8 @@ export default function ApiKeyManager() {
                 <p className="text-xs text-gray-400 mt-1">Created: {new Date(k.created_at).toLocaleDateString()}</p>
               </div>
               <button 
-                className="text-red-600 hover:text-red-800 text-sm font-medium"
-                onClick={() => alert("Revoke functionality coming in Phase 4!")}
+                className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                onClick={() => revokeKey(k.id)}
               >
                 Revoke
               </button>

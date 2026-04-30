@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .auth import get_current_user, verify_api_key, UserSchema
 from .database import get_db
 from .models import User, Subscription
-from .graph_store import graph, init_graph
+from . import graph_store
 
 app = FastAPI(
     title="EcoRoute API",
@@ -153,7 +153,7 @@ async def lemonsqueezy_webhook(
 
 @app.on_event("startup")
 async def startup_event():
-    init_graph()
+    graph_store.init_graph()
 
 @app.get("/")
 def read_root():
@@ -170,17 +170,17 @@ class RouteRequest(BaseModel):
 
 @app.post("/v1/routes", dependencies=[Depends(rate_limit)])
 def calculate_route(request: RouteRequest):
-    if not graph:
+    if not graph_store.graph:
         raise HTTPException(status_code=503, detail="Routing engine not initialized")
 
     try:
         # 1. Map GPS coordinates to nearest graph nodes
-        start_node = graph.nearest_node(request.origin_lat, request.origin_lon)
-        end_node = graph.nearest_node(request.dest_lat, request.dest_lon)
+        start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
+        end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
 
         # 2. Call the Rust engine
         import ecoroute_core
-        routes_json = ecoroute_core.calculate_routes(graph, start_node, end_node, request.vehicle)
+        routes_json = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, request.vehicle)
         routes_data = json.loads(routes_json)
 
         return {

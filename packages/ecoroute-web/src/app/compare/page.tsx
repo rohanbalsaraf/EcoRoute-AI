@@ -87,12 +87,14 @@ export default function ComparePage() {
             distance: `${routes.greenest.total_distance_km.toFixed(1)} km`,
             duration: `${routes.greenest.total_time_min.toFixed(0)} min`,
             carbon: `${routes.greenest.total_carbon_kg.toFixed(2)} kg`,
+            carbonVal: routes.greenest.total_carbon_kg,
             isEco: true,
           },
           standard: {
             distance: `${routes.fastest.total_distance_km.toFixed(1)} km`,
             duration: `${routes.fastest.total_time_min.toFixed(0)} min`,
             carbon: `${routes.fastest.total_carbon_kg.toFixed(2)} kg`,
+            carbonVal: routes.fastest.total_carbon_kg,
             isEco: false,
           }
         });
@@ -134,7 +136,7 @@ export default function ComparePage() {
 
           {results && (
             <div className="mt-2 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <CarbonMeter ecoCarbon={2.1} stdCarbon={4.5} />
+              <CarbonMeter ecoCarbon={results.eco.carbonVal} stdCarbon={results.standard.carbonVal} />
               
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Route Results</h3>

@@ -15,13 +15,13 @@ WORKDIR /app
 # Copy the entire monorepo workspace
 COPY . .
 
-# 1. Build the Rust core engine
+# 1. Build and install the Rust core engine into Python
 WORKDIR /app/packages/ecoroute-core
-RUN cargo build --release
+RUN pip install --no-cache-dir maturin
+RUN maturin develop --release
 
 # 2. Install Python API dependencies
 WORKDIR /app/packages/ecoroute-api
-RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Expose the port Render expects

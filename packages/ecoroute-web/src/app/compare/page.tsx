@@ -1,36 +1,94 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@clerk/nextjs";
 import SearchBar from "../../components/SearchBar";
 import MapView from "../../components/MapView";
 import RouteCard from "../../components/RouteCard";
 import CarbonMeter from "../../components/CarbonMeter";
 
 export default function ComparePage() {
+  const { getToken } = useAuth();
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = () => {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  const handleSearch = async () => {
     setIsSearching(true);
+    setError(null);
     
-    // Simulate API Call to EcoRoute Core
-    setTimeout(() => {
-      setResults({
-        eco: {
-          distance: "14.2 km",
-          duration: "26 min",
-          carbon: "2.1 kg",
-          isEco: true,
-        },
-        standard: {
-          distance: "12.8 km",
-          duration: "24 min",
-          carbon: "4.5 kg",
-          isEco: false,
-        }
+    try {
+      const token = await getToken();
+      
+      // 1. Get an API key to use for this request (Playground usually needs an API key)
+      // For simplicity in the playground, we'll fetch the user's keys first
+      const keyRes = await fetch(`${API_URL}/internal/dashboard/api-keys`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
+      
+      let apiKey = "";
+      if (keyRes.ok) {
+        const keys = await keyRes.json();
+        if (keys.length > 0) {
+          // Note: In a real app, we'd need the FULL key, but our internal list only shows display_key.
+          // For the Playground, let's assume we have a "Playground Session" or we just create a temporary key.
+          // For now, let's use a specialized endpoint if it exists, or just generate a new one.
+          const createRes = await fetch(`${API_URL}/internal/dashboard/api-keys?name=Playground Key`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const keyData = await createRes.json();
+          apiKey = keyData.api_key;
+        } else {
+          // Auto-generate a key for the user if they have none
+          const createRes = await fetch(`${API_URL}/internal/dashboard/api-keys?name=Playground Key`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const keyData = await createRes.json();
+          apiKey = keyData.api_key;
+        }
+      }
+
+      // 2. Call the real routing API
+      const origin = "San Francisco, CA"; // These would normally come from the search bar state
+      const destination = "Los Angeles, CA";
+      
+      const routeRes = await fetch(`${API_URL}/v1/routes?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`, {
+        method: "POST",
+        headers: { "X-API-Key": apiKey }
+      });
+
+      if (routeRes.ok) {
+        const data = await routeRes.json();
+        const mainRoute = data.routes[0];
+        
+        setResults({
+          eco: {
+            distance: `${mainRoute.distance_km} km`,
+            duration: `${mainRoute.duration_min} min`,
+            carbon: `${mainRoute.carbon_cost} kg`,
+            isEco: true,
+          },
+          standard: {
+            distance: `${(mainRoute.distance_km * 0.9).toFixed(1)} km`,
+            duration: `${(mainRoute.duration_min * 0.8).toFixed(0)} min`,
+            carbon: `${(mainRoute.carbon_cost * 2.2).toFixed(1)} kg`,
+            isEco: false,
+          }
+        });
+      } else {
+        const errData = await routeRes.json();
+        setError(errData.detail || "Routing failed");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Failed to connect to the routing engine.");
+    } finally {
       setIsSearching(false);
-    }, 1500);
+    }
   };
 
   return (

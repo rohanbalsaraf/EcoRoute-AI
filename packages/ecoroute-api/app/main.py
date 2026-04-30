@@ -185,8 +185,11 @@ def calculate_route(request: RouteRequest):
 
         # 3. Hydrate path nodes with coordinates for mapping
         def hydrate_path(node_ids):
-            return [{"lat": graph_store.graph.inner.nodes[nid].lat, 
-                     "lon": graph_store.graph.inner.nodes[nid].lon} for nid in node_ids]
+            coords = []
+            for nid in node_ids:
+                lat, lon = graph_store.graph.get_node_coords(nid)
+                coords.append({"lat": lat, "lon": lon})
+            return coords
 
         for r_type in ["greenest", "fastest", "shortest"]:
             if r_type in routes_data:

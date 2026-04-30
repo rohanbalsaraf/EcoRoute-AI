@@ -30,6 +30,14 @@ impl PyRoadGraph {
     pub fn nearest_node(&self, lat: f64, lon: f64) -> usize {
         self.inner.nearest_node(lat, lon)
     }
+
+    pub fn get_node_coords(&self, node_id: usize) -> PyResult<(f64, f64)> {
+        if node_id >= self.inner.nodes.len() {
+            return Err(PyRuntimeError::new_err("Node ID out of bounds"));
+        }
+        let node = &self.inner.nodes[node_id];
+        Ok((node.lat, node.lon))
+    }
 }
 
 #[pyfunction]

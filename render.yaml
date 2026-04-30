@@ -1,0 +1,57 @@
+databases:
+  # Managed PostgreSQL Database
+  - name: ecoroute-db
+    databaseName: ecoroute
+    user: ecoroute
+
+  # Managed Redis Instance
+  - name: ecoroute-redis
+    type: redis
+    ipAllowList: []
+
+services:
+  # The FastAPI Backend (Docker)
+  - type: web
+    name: ecoroute-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free # Can upgrade to starter/pro as needed
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ecoroute-db
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: ecoroute-redis
+          property: connectionString
+      # These must be set manually in the Render Dashboard
+      - key: LEMON_SQUEEZY_WEBHOOK_SECRET
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+
+  # The Next.js Frontend (Native Node)
+  - type: web
+    name: ecoroute-web
+    env: node
+    rootDir: packages/ecoroute-web
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    plan: free
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        # This will dynamically grab the URL of the API service deployed above
+        fromService:
+          type: web
+          name: ecoroute-api
+          property: host
+      # These must be set manually in the Render Dashboard
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: NEXT_PUBLIC_CLERK_SIGN_IN_URL
+        value: /sign-in
+      - key: NEXT_PUBLIC_CLERK_SIGN_UP_URL
+        value: /sign-up

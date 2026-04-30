@@ -35,18 +35,6 @@ export default function ComparePage() {
         geocode(originStr),
         geocode(destinationStr)
       ]);
-
-      // 2. Validate bounds (Demo currently only supports Pune)
-      // Pune approx center: 18.52, 73.85. Bounds: lat [18.4, 18.7], lon [73.7, 74.0]
-      const isWithinPune = (lat: number, lon: number) => {
-        return lat > 18.3 && lat < 18.8 && lon > 73.6 && lon < 74.1;
-      };
-
-      if (!isWithinPune(origin.lat, origin.lon) || !isWithinPune(dest.lat, dest.lon)) {
-        setError("EcoRoute currently only supports the Pune Metropolitan Area for this demo. Please try searching for locations like 'Pune Station', 'Baner', or 'Hinjewadi'.");
-        setIsSearching(false);
-        return;
-      }
       
       // 1. Get an API key to use for this request (Playground usually needs an API key)
       // For simplicity in the playground, we'll fetch the user's keys first

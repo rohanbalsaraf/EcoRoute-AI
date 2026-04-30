@@ -174,6 +174,18 @@ def calculate_route(request: RouteRequest):
         raise HTTPException(status_code=503, detail="Routing engine not initialized")
 
     try:
+        # 0. On-demand ingestion: If the request is far from our current graph center, fetch new OSM data
+        # Basic check: is the point more than 10km away from any node? 
+        # (This is a simplified check for the demo)
+        start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
+        lat_node, lon_node = graph_store.graph.get_node_coords(start_node)
+        
+        dist_sq = (lat_node - request.origin_lat)**2 + (lon_node - request.origin_lon)**2
+        if dist_sq > 0.01: # approx 10km away
+            print(f"🌍 New area detected! Ingesting OSM data for {request.origin_lat}, {request.origin_lon}...")
+            success = graph_store.update_graph_for_area(request.origin_lat, request.origin_lon)
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to ingest OSM data for this area")
         # 1. Map GPS coordinates to nearest graph nodes
         start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
         end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)

@@ -59,7 +59,27 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       if (!map.current) return;
       mapReady.current = true;
 
-      // Eco route with glow
+      // Standard route (rendered FIRST so it appears underneath)
+      map.current.addSource('std-route', {
+        type: 'geojson',
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+      });
+      map.current.addLayer({
+        id: 'std-route-glow',
+        type: 'line',
+        source: 'std-route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#F97316', 'line-width': 12, 'line-opacity': 0.12, 'line-blur': 6 }
+      });
+      map.current.addLayer({
+        id: 'std-route-line',
+        type: 'line',
+        source: 'std-route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#F97316', 'line-width': 5, 'line-opacity': 0.8 }
+      });
+
+      // Eco route with glow (rendered ON TOP)
       map.current.addSource('eco-route', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
@@ -77,19 +97,6 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
         source: 'eco-route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': '#00FFA3', 'line-width': 5, 'line-opacity': 0.9 }
-      });
-
-      // Standard route
-      map.current.addSource('std-route', {
-        type: 'geojson',
-        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
-      });
-      map.current.addLayer({
-        id: 'std-route-line',
-        type: 'line',
-        source: 'std-route',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#F97316', 'line-width': 4, 'line-dasharray': [2, 2], 'line-opacity': 0.7 }
       });
 
       // Create markers
@@ -163,6 +170,32 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-16 h-16 rounded-full border-4 border-gray-600 border-t-[#00FFA3] animate-spin"></div>
           <p className="mt-4 text-[#00FFA3] font-semibold tracking-wider text-sm animate-pulse">CALCULATING ROUTES...</p>
+        </div>
+      )}
+
+      {/* Route Legend */}
+      {routeGeometries && (
+        <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-sm px-3 py-2.5 rounded-lg shadow-lg text-[11px]">
+          <p className="font-bold text-gray-800 text-[10px] uppercase tracking-wider mb-1.5">Routes</p>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-5 h-1 rounded-full bg-[#00FFA3]"></div>
+            <span className="text-gray-700 font-medium">Eco-Friendly</span>
+          </div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="w-5 h-1 rounded-full bg-[#F97316]"></div>
+            <span className="text-gray-700 font-medium">Standard</span>
+          </div>
+          <div className="border-t border-gray-200 pt-1.5 mt-1">
+            <p className="font-bold text-gray-800 text-[10px] uppercase tracking-wider mb-1">Traffic</p>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-gray-600 text-[10px]">Light</span>
+              <div className="w-2 h-2 rounded-full bg-yellow-500 ml-1"></div>
+              <span className="text-gray-600 text-[10px]">Moderate</span>
+              <div className="w-2 h-2 rounded-full bg-red-500 ml-1"></div>
+              <span className="text-gray-600 text-[10px]">Heavy</span>
+            </div>
+          </div>
         </div>
       )}
 

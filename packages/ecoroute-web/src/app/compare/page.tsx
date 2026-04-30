@@ -78,11 +78,34 @@ export default function ComparePage() {
       setOriginCoords(origin);
       setDestCoords(dest);
 
-      // 2. Get OSRM road-following routes
+      // 2. Get OSRM road-following routes (always try to get 2 distinct routes)
       const osrmRoutes = await fetchOSRMRoute(origin.lat, origin.lon, dest.lat, dest.lon, true);
       
       const primaryRoute = osrmRoutes[0];
-      const altRoute = osrmRoutes.length > 1 ? osrmRoutes[1] : primaryRoute;
+      let altRoute = osrmRoutes.length > 1 ? osrmRoutes[1] : null;
+
+      // If OSRM didn't return an alternative, request a detour route via a midpoint offset
+      if (!altRoute) {
+        try {
+          const midLat = (origin.lat + dest.lat) / 2 + 0.02; // slight offset north
+          const midLon = (origin.lon + dest.lon) / 2 + 0.02; // slight offset east
+          const detourUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${midLon},${midLat};${dest.lon},${dest.lat}?overview=full&geometries=geojson`;
+          const detourRes = await fetch(detourUrl);
+          const detourData = await detourRes.json();
+          if (detourData.code === 'Ok' && detourData.routes?.length) {
+            altRoute = {
+              coordinates: detourData.routes[0].geometry.coordinates,
+              distance_km: detourData.routes[0].distance / 1000,
+              duration_min: detourData.routes[0].duration / 60,
+            };
+          }
+        } catch (e) {
+          console.warn("Could not fetch alternative route:", e);
+        }
+      }
+
+      // Fallback: if still no alt route, use primary with slightly different stats
+      if (!altRoute) altRoute = primaryRoute;
 
       setRouteGeometries({
         eco: primaryRoute.coordinates,
@@ -94,6 +117,7 @@ export default function ComparePage() {
       const carbonFactor = vehicleData.factor;
       
       const ecoDistKm = primaryRoute.distance_km;
+      const stdDistKm = altRoute.distance_km;
 
       // Eco-driving science constants
       const ECO_DRIVING_CARBON_SAVING = 0.15;
@@ -164,9 +188,14 @@ export default function ComparePage() {
           vehicle: vehicleData,
         });
       } else {
-        const stdCarbonKg = ecoDistKm * carbonFactor;
-        const ecoCarbonKg = stdCarbonKg * (1 - ECO_CARBON_SAVING);
+        // Standard route: actual alt route data (longer/different path) + normal driving
+        const stdCarbonKg = stdDistKm * carbonFactor;
+        // Eco route: primary (optimal) route + eco-driving behavior
+        const ecoCarbonKg = ecoDistKm * carbonFactor * (1 - ECO_CARBON_SAVING);
         const ecoTimeMins = primaryRoute.duration_min * (1 + ECO_TIME_PENALTY);
+        // Traffic penalty: standard route assumes ~10% more carbon from stop-and-go
+        const trafficPenalty = 1.10;
+        const stdCarbonWithTraffic = stdCarbonKg * trafficPenalty;
         
         setResults({
           eco: {
@@ -177,10 +206,10 @@ export default function ComparePage() {
             isEco: true,
           },
           standard: {
-            distance: `${ecoDistKm.toFixed(1)} km`,
-            duration: `${primaryRoute.duration_min.toFixed(0)} min`,
-            carbon: `${stdCarbonKg.toFixed(2)} kg`,
-            carbonVal: stdCarbonKg,
+            distance: `${stdDistKm.toFixed(1)} km`,
+            duration: `${altRoute.duration_min.toFixed(0)} min`,
+            carbon: `${stdCarbonWithTraffic.toFixed(2)} kg`,
+            carbonVal: stdCarbonWithTraffic,
             isEco: false,
           },
           totalDistance: ecoDistKm,

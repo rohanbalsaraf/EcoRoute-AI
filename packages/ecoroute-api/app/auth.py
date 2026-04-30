@@ -7,7 +7,10 @@ from .models import User, APIKey, Subscription
 import bcrypt
 from pydantic import BaseModel
 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
+
 security = HTTPBearer()
+api_key_header = APIKeyHeader(name="X-API-Key")
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
 
 class UserSchema(BaseModel):
@@ -23,11 +26,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
     return UserSchema(id="user_123", email="dev@example.com")
 
 async def verify_api_key(
-    api_key: str = Security(HTTPBearer()), 
+    api_key: str = Security(api_key_header), 
     db: Session = Depends(get_db)
 ):
     """Verifies external developer API keys against the database."""
-    token = api_key.credentials
+    token = api_key
     
     # We will search by the exact hashed key using a simple lookup since
     # hashing an API key directly (e.g. SHA256) is better for indexing.

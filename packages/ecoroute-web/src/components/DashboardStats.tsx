@@ -49,10 +49,10 @@ export default function DashboardStats() {
   const usagePercentage = Math.min(100, (stats.api_calls_this_month / stats.limit) * 100);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border md:col-span-3">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Usage & Billing</h2>
-        <span className={`text-xs font-medium px-2.5 py-0.5 rounded ${stats.tier === "Pro" ? "bg-purple-100 text-purple-800" : "bg-green-100 text-green-800"}`}>
+    <div className="bg-white p-5 rounded-lg shadow-sm border md:col-span-3">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">Usage & Billing</h2>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded ${stats.tier === "Pro" ? "bg-purple-100 text-purple-800" : "bg-green-100 text-green-800"}`}>
           {stats.tier} Tier
         </span>
       </div>

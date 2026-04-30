@@ -75,18 +75,19 @@ body {
 .btn-primary {
   background: var(--neon-green);
   color: #000;
-  font-weight: 600;
-  padding: 12px 24px;
-  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  padding: 8px 16px;
+  border-radius: 6px;
   transition: var(--transition-smooth);
   border: none;
   cursor: pointer;
-  box-shadow: 0 0 15px transparent;
+  box-shadow: 0 0 10px transparent;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px var(--neon-green-glow);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px var(--neon-green-glow);
   background: #00e693;
 }
 
@@ -95,8 +96,9 @@ body {
   backdrop-filter: blur(10px);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
-  padding: 12px 24px;
-  border-radius: 8px;
+  font-size: 0.875rem;
+  padding: 8px 16px;
+  border-radius: 6px;
   transition: var(--transition-smooth);
 }
 

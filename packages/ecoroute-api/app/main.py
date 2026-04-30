@@ -175,24 +175,31 @@ def calculate_route(request: RouteRequest):
 
     try:
         # 0. On-demand ingestion: If the request is far from our current graph center, fetch new OSM data
-        # Basic check: is the point more than 10km away from any node? 
-        # (This is a simplified check for the demo)
         start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
         lat_node, lon_node = graph_store.graph.get_node_coords(start_node)
         
         dist_sq = (lat_node - request.origin_lat)**2 + (lon_node - request.origin_lon)**2
-        if dist_sq > 0.01: # approx 10km away
+        if dist_sq > 0.02: # increased threshold to ~15km
             print(f"🌍 New area detected! Ingesting OSM data for {request.origin_lat}, {request.origin_lon}...")
             success = graph_store.update_graph_for_area(request.origin_lat, request.origin_lon)
             if not success:
-                raise HTTPException(status_code=500, detail="Failed to ingest OSM data for this area")
+                print("⚠️ Ingestion failed, attempting to proceed with current graph...")
+            else:
+                start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
+                end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
+
         # 1. Map GPS coordinates to nearest graph nodes
         start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
         end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
 
         # 2. Call the Rust engine
         import ecoroute_core
-        routes_json = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, request.vehicle)
+        try:
+            routes_json = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, request.vehicle)
+        except Exception as e:
+            if "No path found" in str(e):
+                raise HTTPException(status_code=404, detail=f"No path found between these locations in the current map data. Try searching for locations within 10km of each other.")
+            raise e
         routes_data = json.loads(routes_json)
 
         # 3. Hydrate path nodes with coordinates for mapping

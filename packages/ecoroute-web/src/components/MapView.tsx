@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -13,11 +13,64 @@ interface MapViewProps {
   selectedRoute?: "eco" | "standard";
 }
 
+// POI categories with emoji icons and Overpass tags
+const POI_CATEGORIES = [
+  { id: 'fuel',     label: 'Fuel',       emoji: '⛽', query: 'amenity=fuel' },
+  { id: 'hospital', label: 'Hospital',   emoji: '🏥', query: 'amenity=hospital' },
+  { id: 'cafe',     label: 'Café',       emoji: '☕', query: 'amenity=cafe' },
+  { id: 'hotel',    label: 'Hotel',      emoji: '🏨', query: 'tourism=hotel' },
+  { id: 'shop',     label: 'Shop',       emoji: '🛒', query: 'shop=supermarket' },
+  { id: 'cinema',   label: 'Cinema',     emoji: '🎬', query: 'amenity=cinema' },
+];
+
+async function fetchPOIs(bounds: maplibregl.LngLatBounds, categories: string[]): Promise<any[]> {
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
+  
+  const filters = categories
+    .map(catId => {
+      const cat = POI_CATEGORIES.find(c => c.id === catId);
+      if (!cat) return '';
+      const [key, val] = cat.query.split('=');
+      return `node["${key}"="${val}"](${bbox});`;
+    })
+    .join('\n');
+
+  const query = `[out:json][timeout:10];(${filters});out body 30;`;
+  
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    const data = await res.json();
+    return data.elements || [];
+  } catch (e) {
+    console.warn('POI fetch failed:', e);
+    return [];
+  }
+}
+
+function getPoiEmoji(tags: any): string {
+  if (tags.amenity === 'fuel') return '⛽';
+  if (tags.amenity === 'hospital') return '🏥';
+  if (tags.amenity === 'cafe') return '☕';
+  if (tags.tourism === 'hotel') return '🏨';
+  if (tags.shop === 'supermarket') return '🛒';
+  if (tags.amenity === 'cinema') return '🎬';
+  return '📍';
+}
+
 export default function MapView({ isActive, isSearching, routeGeometries, originCoords, destCoords, selectedRoute = "eco" }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<{ origin: maplibregl.Marker | null; dest: maplibregl.Marker | null }>({ origin: null, dest: null });
+  const poiMarkersRef = useRef<maplibregl.Marker[]>([]);
   const mapReady = useRef(false);
+  const [activePOIs, setActivePOIs] = useState<string[]>([]);
+  const [poiLoading, setPOILoading] = useState(false);
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
@@ -35,11 +88,8 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
           }
         },
         layers: [{
-          id: 'osm-tiles',
-          type: 'raster',
-          source: 'osm-tiles',
-          minzoom: 0,
-          maxzoom: 19
+          id: 'osm-tiles', type: 'raster', source: 'osm-tiles',
+          minzoom: 0, maxzoom: 19
         }]
       },
       center: [0, 20],
@@ -104,7 +154,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     };
   }, []);
 
-  // Update route data on map
+  // Render routes
   useEffect(() => {
     if (!map.current || !mapReady.current || !routeGeometries) return;
 
@@ -124,7 +174,6 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       });
     }
 
-    // Fit bounds to BOTH routes
     if (originCoords && destCoords) {
       const bounds = new maplibregl.LngLatBounds();
       routeGeometries.eco.forEach(c => bounds.extend(c as [number, number]));
@@ -143,7 +192,6 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
   // Highlight selected route
   useEffect(() => {
     if (!map.current || !mapReady.current) return;
-
     const isEco = selectedRoute === "eco";
     
     map.current.setPaintProperty('eco-route-line', 'line-width', isEco ? 6 : 3);
@@ -154,6 +202,56 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     map.current.setPaintProperty('std-route-line', 'line-opacity', !isEco ? 1 : 0.4);
     map.current.setPaintProperty('std-route-glow', 'line-opacity', !isEco ? 0.2 : 0.05);
   }, [selectedRoute]);
+
+  // Load POIs when categories change
+  useEffect(() => {
+    // Clear existing POI markers
+    poiMarkersRef.current.forEach(m => m.remove());
+    poiMarkersRef.current = [];
+
+    if (!map.current || !mapReady.current || activePOIs.length === 0 || !routeGeometries) return;
+
+    const loadPOIs = async () => {
+      setPOILoading(true);
+      const bounds = map.current!.getBounds();
+      const pois = await fetchPOIs(bounds, activePOIs);
+      
+      pois.forEach(poi => {
+        if (!poi.lat || !poi.lon || !map.current) return;
+        
+        const emoji = getPoiEmoji(poi.tags || {});
+        const name = poi.tags?.name || '';
+        
+        const el = document.createElement('div');
+        el.style.cssText = 'cursor:pointer;font-size:18px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5));transition:transform 0.2s;';
+        el.textContent = emoji;
+        el.title = name;
+        el.onmouseenter = () => { el.style.transform = 'scale(1.4)'; };
+        el.onmouseleave = () => { el.style.transform = 'scale(1)'; };
+        
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([poi.lon, poi.lat]);
+        
+        if (name) {
+          marker.setPopup(new maplibregl.Popup({ offset: 15, closeButton: false })
+            .setHTML(`<div style="font-size:12px;font-weight:600;padding:2px 4px;">${emoji} ${name}</div>`));
+        }
+        
+        marker.addTo(map.current!);
+        poiMarkersRef.current.push(marker);
+      });
+      
+      setPOILoading(false);
+    };
+
+    loadPOIs();
+  }, [activePOIs, routeGeometries]);
+
+  const togglePOI = (catId: string) => {
+    setActivePOIs(prev => 
+      prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
+    );
+  };
 
   return (
     <div className="w-full h-full relative">
@@ -166,27 +264,41 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
         </div>
       )}
 
-      {/* Route Legend */}
+      {/* Route Legend + POI Toggles */}
       {routeGeometries && (
-        <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-sm px-3 py-2.5 rounded-lg shadow-lg text-[11px]">
+        <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-sm px-3 py-2.5 rounded-lg shadow-lg text-[11px] max-w-[180px]">
           <p className="font-bold text-gray-800 text-[10px] uppercase tracking-wider mb-1.5">Routes</p>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-5 h-1 rounded-full bg-[#00FFA3]"></div>
             <span className="text-gray-700 font-medium">Eco-Friendly</span>
           </div>
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center gap-2 mb-2">
             <div className="w-5 h-1 rounded-full bg-[#F97316]"></div>
             <span className="text-gray-700 font-medium">Standard</span>
           </div>
-          <div className="border-t border-gray-200 pt-1.5 mt-1">
-            <p className="font-bold text-gray-800 text-[10px] uppercase tracking-wider mb-1">Traffic</p>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="text-gray-600 text-[10px]">Light</span>
-              <div className="w-2 h-2 rounded-full bg-yellow-500 ml-1"></div>
-              <span className="text-gray-600 text-[10px]">Moderate</span>
-              <div className="w-2 h-2 rounded-full bg-red-500 ml-1"></div>
-              <span className="text-gray-600 text-[10px]">Heavy</span>
+          
+          {/* POI Toggles */}
+          <div className="border-t border-gray-200 pt-2">
+            <p className="font-bold text-gray-800 text-[10px] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              Nearby Places
+              {poiLoading && <span className="inline-block w-2.5 h-2.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>}
+            </p>
+            <div className="grid grid-cols-3 gap-1">
+              {POI_CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => togglePOI(cat.id)}
+                  title={cat.label}
+                  className={`flex flex-col items-center py-1 rounded text-[10px] transition-all ${
+                    activePOIs.includes(cat.id)
+                      ? 'bg-blue-50 text-blue-700 font-semibold'
+                      : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  <span className="text-base">{cat.emoji}</span>
+                  <span className="leading-tight mt-0.5">{cat.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>

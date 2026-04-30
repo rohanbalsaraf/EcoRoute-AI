@@ -33,7 +33,7 @@ export default async function RootLayout({
               ) : (
                 <div className="flex items-center gap-4">
                   <a href="/dashboard" className="text-gray-600 hover:text-green-600 font-medium">Dashboard</a>
-                  <UserButton afterSignOutUrl="/"/>
+                  <UserButton />
                 </div>
               )}
             </div>

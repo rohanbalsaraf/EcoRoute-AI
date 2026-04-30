@@ -24,12 +24,16 @@ function AutocompleteInput({
   value, 
   onChange, 
   placeholder, 
-  dotColor 
+  dotColor,
+  onUseGPS,
+  isOrigin
 }: { 
   value: string; 
   onChange: (val: string) => void; 
   placeholder: string; 
   dotColor: string;
+  onUseGPS?: () => void;
+  isOrigin?: boolean;
 }) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -61,7 +65,6 @@ function AutocompleteInput({
     return () => controller.abort();
   }, [debouncedValue]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -81,13 +84,26 @@ function AutocompleteInput({
         onChange={(e) => { onChange(e.target.value); setShowDropdown(true); }}
         onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
         placeholder={placeholder}
-        className="w-full bg-[var(--surface)] text-sm border border-[var(--border-subtle)] text-white rounded-md pl-7 pr-3 py-2 focus:outline-none focus:border-[var(--neon-green)] focus:ring-1 focus:ring-[var(--neon-green)] transition-all"
+        className="w-full bg-[var(--surface)] text-sm border border-[var(--border-subtle)] text-white rounded-md pl-7 pr-16 py-2 focus:outline-none focus:border-[var(--neon-green)] focus:ring-1 focus:ring-[var(--neon-green)] transition-all"
       />
-      {isFetching && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        {isFetching && (
           <div className="w-3 h-3 border-2 border-[var(--neon-green)] border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      )}
+        )}
+        {isOrigin && onUseGPS && (
+          <button
+            type="button"
+            onClick={onUseGPS}
+            title="Use my GPS location"
+            className="p-1 rounded hover:bg-[var(--surface-glass)] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5 text-[var(--neon-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+          </button>
+        )}
+      </div>
 
       {showDropdown && suggestions.length > 0 && (
         <ul className="absolute z-50 top-full mt-1 left-0 w-full bg-[var(--surface)] border border-[var(--border-subtle)] rounded-lg shadow-2xl max-h-48 overflow-y-auto">
@@ -110,14 +126,44 @@ function AutocompleteInput({
 export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
+
+  const handleUseGPS = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        // Reverse geocode to get readable address
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          setOrigin(data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        } catch {
+          setOrigin(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        }
+        setGpsLoading(false);
+      },
+      (err) => {
+        alert('Could not get your location. Please allow location access.');
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   return (
     <div className="glass-panel p-3 flex flex-col gap-3">
       <AutocompleteInput
-        value={origin}
+        value={gpsLoading ? 'Getting your location...' : origin}
         onChange={setOrigin}
         placeholder="Search origin (e.g., Times Square, NYC)"
         dotColor="blue"
+        onUseGPS={handleUseGPS}
+        isOrigin={true}
       />
       
       <div className="relative flex justify-center -my-2.5 z-10">

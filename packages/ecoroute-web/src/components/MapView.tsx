@@ -10,9 +10,10 @@ interface MapViewProps {
   routeGeometries?: { eco: [number, number][]; standard: [number, number][] } | null;
   originCoords?: { lat: number; lon: number } | null;
   destCoords?: { lat: number; lon: number } | null;
+  selectedRoute?: "eco" | "standard";
 }
 
-export default function MapView({ isActive, isSearching, routeGeometries, originCoords, destCoords }: MapViewProps) {
+export default function MapView({ isActive, isSearching, routeGeometries, originCoords, destCoords, selectedRoute = "eco" }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<{ origin: maplibregl.Marker | null; dest: maplibregl.Marker | null }>({ origin: null, dest: null });
@@ -28,131 +29,108 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
         sources: {
           'osm-tiles': {
             type: 'raster',
-            tiles: [
-              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ],
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '&copy; OpenStreetMap contributors'
           }
         },
-        layers: [
-          {
-            id: 'osm-tiles',
-            type: 'raster',
-            source: 'osm-tiles',
-            minzoom: 0,
-            maxzoom: 19
-          }
-        ]
+        layers: [{
+          id: 'osm-tiles',
+          type: 'raster',
+          source: 'osm-tiles',
+          minzoom: 0,
+          maxzoom: 19
+        }]
       },
       center: [0, 20],
       zoom: 2,
       attributionControl: false
     });
 
-    const resizeObserver = new ResizeObserver(() => {
-      map.current?.resize();
-    });
+    const resizeObserver = new ResizeObserver(() => map.current?.resize());
     resizeObserver.observe(mapContainer.current);
 
     map.current.on('load', () => {
       if (!map.current) return;
       mapReady.current = true;
 
-      // Standard route (rendered FIRST so it appears underneath)
+      // Standard route (underneath)
       map.current.addSource('std-route', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
       });
       map.current.addLayer({
-        id: 'std-route-glow',
-        type: 'line',
-        source: 'std-route',
+        id: 'std-route-glow', type: 'line', source: 'std-route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#F97316', 'line-width': 12, 'line-opacity': 0.12, 'line-blur': 6 }
+        paint: { 'line-color': '#F97316', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
       });
       map.current.addLayer({
-        id: 'std-route-line',
-        type: 'line',
-        source: 'std-route',
+        id: 'std-route-line', type: 'line', source: 'std-route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': '#F97316', 'line-width': 5, 'line-opacity': 0.8 }
       });
 
-      // Eco route with glow (rendered ON TOP)
+      // Eco route (on top)
       map.current.addSource('eco-route', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
       });
       map.current.addLayer({
-        id: 'eco-route-glow',
-        type: 'line',
-        source: 'eco-route',
+        id: 'eco-route-glow', type: 'line', source: 'eco-route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': '#00FFA3', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
       });
       map.current.addLayer({
-        id: 'eco-route-line',
-        type: 'line',
-        source: 'eco-route',
+        id: 'eco-route-line', type: 'line', source: 'eco-route',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': '#00FFA3', 'line-width': 5, 'line-opacity': 0.9 }
       });
 
-      // Create markers
+      // Markers
       const originEl = document.createElement('div');
-      originEl.innerHTML = '<div style="width:16px;height:16px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 0 8px rgba(59,130,246,0.6);"></div>';
+      originEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
       markersRef.current.origin = new maplibregl.Marker({ element: originEl, anchor: 'center' });
 
       const destEl = document.createElement('div');
-      destEl.innerHTML = '<div style="width:16px;height:16px;border-radius:50%;background:#00FFA3;border:3px solid white;box-shadow:0 0 8px rgba(0,255,163,0.6);"></div>';
+      destEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#EF4444;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
       markersRef.current.dest = new maplibregl.Marker({ element: destEl, anchor: 'center' });
     });
 
     return () => {
       resizeObserver.disconnect();
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-        mapReady.current = false;
-      }
+      map.current?.remove();
+      map.current = null;
+      mapReady.current = false;
     };
   }, []);
 
-  // Render routes when geometry arrives
+  // Update route data on map
   useEffect(() => {
     if (!map.current || !mapReady.current || !routeGeometries) return;
 
-    // Update eco route
     const ecoSource = map.current.getSource('eco-route') as maplibregl.GeoJSONSource;
-    if (ecoSource && routeGeometries.eco.length > 0) {
+    if (ecoSource) {
       ecoSource.setData({
-        type: 'Feature',
-        properties: {},
+        type: 'Feature', properties: {},
         geometry: { type: 'LineString', coordinates: routeGeometries.eco }
       });
     }
 
-    // Update standard route
     const stdSource = map.current.getSource('std-route') as maplibregl.GeoJSONSource;
-    if (stdSource && routeGeometries.standard.length > 0) {
+    if (stdSource) {
       stdSource.setData({
-        type: 'Feature',
-        properties: {},
+        type: 'Feature', properties: {},
         geometry: { type: 'LineString', coordinates: routeGeometries.standard }
       });
     }
 
-    // Fit bounds
+    // Fit bounds to BOTH routes
     if (originCoords && destCoords) {
       const bounds = new maplibregl.LngLatBounds();
-      
-      // Use all route points for accurate bounds
       routeGeometries.eco.forEach(c => bounds.extend(c as [number, number]));
-      
+      routeGeometries.standard.forEach(c => bounds.extend(c as [number, number]));
       map.current.fitBounds(bounds, { padding: 60, duration: 1500 });
 
-      // Place markers
       if (markersRef.current.origin) {
         markersRef.current.origin.setLngLat([originCoords.lon, originCoords.lat]).addTo(map.current!);
       }
@@ -161,6 +139,21 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       }
     }
   }, [routeGeometries, originCoords, destCoords]);
+
+  // Highlight selected route
+  useEffect(() => {
+    if (!map.current || !mapReady.current) return;
+
+    const isEco = selectedRoute === "eco";
+    
+    map.current.setPaintProperty('eco-route-line', 'line-width', isEco ? 6 : 3);
+    map.current.setPaintProperty('eco-route-line', 'line-opacity', isEco ? 1 : 0.4);
+    map.current.setPaintProperty('eco-route-glow', 'line-opacity', isEco ? 0.2 : 0.05);
+    
+    map.current.setPaintProperty('std-route-line', 'line-width', !isEco ? 6 : 3);
+    map.current.setPaintProperty('std-route-line', 'line-opacity', !isEco ? 1 : 0.4);
+    map.current.setPaintProperty('std-route-glow', 'line-opacity', !isEco ? 0.2 : 0.05);
+  }, [selectedRoute]);
 
   return (
     <div className="w-full h-full relative">

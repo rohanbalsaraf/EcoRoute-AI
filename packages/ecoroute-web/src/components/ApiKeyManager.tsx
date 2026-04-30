@@ -7,6 +7,7 @@ export default function ApiKeyManager() {
   const { getToken } = useAuth();
   const [keys, setKeys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<{ raw: string; display: string } | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -23,6 +24,7 @@ export default function ApiKeyManager() {
       }
     } catch (error) {
       console.error("Failed to fetch keys:", error);
+      setError("Failed to connect to API server.");
     } finally {
       setLoading(false);
     }
@@ -117,7 +119,10 @@ export default function ApiKeyManager() {
       )}
 
       <div className="space-y-2">
-        {keys.length === 0 && !loading && (
+        {error && (
+          <p className="text-red-400 text-[10px] italic mb-2">Connection Error: Ensure NEXT_PUBLIC_API_URL is set correctly (Current: {API_URL})</p>
+        )}
+        {keys.length === 0 && !loading && !error && (
           <p className="text-[var(--text-secondary)] text-xs italic">No API keys found. Generate one to get started.</p>
         )}
         {keys.map((k) => (

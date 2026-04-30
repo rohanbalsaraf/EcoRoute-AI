@@ -40,8 +40,12 @@ export default function DashboardStats() {
 
   if (!stats) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-sm border md:col-span-3">
-        <p className="text-red-500">Failed to load analytics.</p>
+      <div className="glass-panel p-4 md:col-span-3">
+        <p className="text-red-400 text-sm font-medium flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Analytics unavailable. Ensure NEXT_PUBLIC_API_URL is set correctly.
+        </p>
+        <p className="text-[10px] text-gray-600 mt-1">Target: {API_URL}</p>
       </div>
     );
   }

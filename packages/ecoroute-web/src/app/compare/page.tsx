@@ -105,6 +105,16 @@ export default function ComparePage() {
             <SearchBar onSearch={handleSearch} isLoading={isSearching} />
           </div>
 
+          {error && (
+            <div className="bg-[rgba(255,100,100,0.1)] border border-red-500/50 p-3 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+              <p className="text-red-400 text-xs font-medium flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                {error}
+              </p>
+              <p className="text-[10px] text-gray-600 mt-1">Check if API_URL is correct: {API_URL}</p>
+            </div>
+          )}
+
           {results && (
             <div className="mt-2 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <CarbonMeter ecoCarbon={2.1} stdCarbon={4.5} />

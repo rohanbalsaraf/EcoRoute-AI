@@ -7,13 +7,15 @@ import MapView from "../../components/MapView";
 import RouteCard from "../../components/RouteCard";
 import CarbonMeter from "../../components/CarbonMeter";
 
-// Carbon emission factors (kg CO2 per km)
-const CARBON_FACTORS: Record<string, number> = {
-  petrol: 0.21,
-  diesel: 0.27,
-  cng: 0.16,
-  ev: 0.0,
-};
+// Carbon emission factors (kg CO2 per km) — based on EPA & IPCC data
+const VEHICLES = [
+  { id: "petrol",   label: "Petrol Car",   icon: "⛽", factor: 0.21, color: "#F59E0B" },
+  { id: "diesel",   label: "Diesel Car",   icon: "🛢️", factor: 0.27, color: "#EF4444" },
+  { id: "cng",      label: "CNG Car",      icon: "💨", factor: 0.16, color: "#3B82F6" },
+  { id: "hybrid",   label: "Hybrid",       icon: "🔋", factor: 0.10, color: "#8B5CF6" },
+  { id: "ev",       label: "Electric (EV)",icon: "⚡", factor: 0.00, color: "#00FFA3" },
+  { id: "bike",     label: "Motorcycle",   icon: "🏍️", factor: 0.11, color: "#F97316" },
+];
 
 interface RouteGeometry {
   coordinates: [number, number][];
@@ -31,7 +33,7 @@ async function fetchOSRMRoute(
   const data = await res.json();
 
   if (data.code !== 'Ok' || !data.routes?.length) {
-    throw new Error('OSRM could not find a route between these locations.');
+    throw new Error('Could not find a driving route between these locations.');
   }
 
   return data.routes.map((r: any) => ({
@@ -49,6 +51,7 @@ export default function ComparePage() {
   const [originCoords, setOriginCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [destCoords, setDestCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [routeGeometries, setRouteGeometries] = useState<{ eco: [number, number][]; standard: [number, number][] } | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState("petrol");
 
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const API_URL = rawApiUrl.replace(/\/$/, "");
@@ -75,33 +78,31 @@ export default function ComparePage() {
       setOriginCoords(origin);
       setDestCoords(dest);
 
-      // 2. Get OSRM road-following routes (this always works globally)
+      // 2. Get OSRM road-following routes
       const osrmRoutes = await fetchOSRMRoute(origin.lat, origin.lon, dest.lat, dest.lon, true);
       
       const primaryRoute = osrmRoutes[0];
       const altRoute = osrmRoutes.length > 1 ? osrmRoutes[1] : primaryRoute;
 
-      // Set the road-following geometry for the map immediately
       setRouteGeometries({
         eco: primaryRoute.coordinates,
         standard: altRoute.coordinates,
       });
 
-      // 3. Calculate carbon using our model
-      const vehicle = "petrol";
-      const carbonFactor = CARBON_FACTORS[vehicle] || 0.21;
+      // 3. Calculate carbon based on selected vehicle
+      const vehicleData = VEHICLES.find(v => v.id === selectedVehicle) || VEHICLES[0];
+      const carbonFactor = vehicleData.factor;
       
-      // Eco route = shorter distance, standard = alternative or same
       const ecoDistKm = primaryRoute.distance_km;
-      const stdDistKm = altRoute.distance_km;
-      const ecoCarbonKg = ecoDistKm * carbonFactor;
-      const stdCarbonKg = stdDistKm * carbonFactor;
+
+      // Eco-driving science constants
+      const ECO_DRIVING_CARBON_SAVING = 0.15;
+      const ECO_DRIVING_TIME_PENALTY  = 0.08;
       
-      // 4. Try to enhance with our Rust backend (optional — won't block UI)
+      // 4. Try to enhance with our Rust backend
       let rustData = null;
       try {
         const token = await getToken();
-        // Get or create API key
         let apiKey = "";
         const createRes = await fetch(`${API_URL}/internal/dashboard/api-keys?name=Playground Key`, {
           method: "POST",
@@ -120,10 +121,10 @@ export default function ComparePage() {
               origin_lon: origin.lon,
               dest_lat: dest.lat,
               dest_lon: dest.lon,
-              vehicle
+              vehicle: selectedVehicle
             }),
             headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(15000) // 15s timeout
+            signal: AbortSignal.timeout(15000)
           });
 
           if (routeRes.ok) {
@@ -135,20 +136,13 @@ export default function ComparePage() {
         console.warn("Rust engine unavailable, using OSRM estimates:", e);
       }
 
-      // 5. Build results — always show meaningful eco vs standard differentiation
-      //
-      // Eco-driving science: Smooth acceleration, optimal cruising speed (50-80 km/h),
-      // anticipatory braking, and reduced idling save 10-20% fuel on ANY route.
-      // Sources: EPA, IEA, European Commission studies.
-      //
-      const ECO_DRIVING_CARBON_SAVING = 0.15;  // 15% less CO2 from eco-driving behavior
-      const ECO_DRIVING_TIME_PENALTY  = 0.08;  // 8% slower due to smoother driving
+      // 5. Build results
+      const ECO_CARBON_SAVING = ECO_DRIVING_CARBON_SAVING;
+      const ECO_TIME_PENALTY  = ECO_DRIVING_TIME_PENALTY;
       
       if (rustData) {
-        // Rust engine has its own differentiation via different algorithms
         const greenCarbon = rustData.greenest.total_carbon_kg;
         const fastCarbon = rustData.fastest.total_carbon_kg;
-        // Ensure there's always a visible difference
         const effectiveFastCarbon = Math.max(fastCarbon, greenCarbon * 1.12);
         
         setResults({
@@ -166,12 +160,13 @@ export default function ComparePage() {
             carbonVal: effectiveFastCarbon,
             isEco: false,
           },
+          totalDistance: ecoDistKm,
+          vehicle: vehicleData,
         });
       } else {
-        // OSRM-based: same road, but eco-driving vs normal driving
         const stdCarbonKg = ecoDistKm * carbonFactor;
-        const ecoCarbonKg = stdCarbonKg * (1 - ECO_DRIVING_CARBON_SAVING);
-        const ecoTimeMins = primaryRoute.duration_min * (1 + ECO_DRIVING_TIME_PENALTY);
+        const ecoCarbonKg = stdCarbonKg * (1 - ECO_CARBON_SAVING);
+        const ecoTimeMins = primaryRoute.duration_min * (1 + ECO_TIME_PENALTY);
         
         setResults({
           eco: {
@@ -188,6 +183,8 @@ export default function ComparePage() {
             carbonVal: stdCarbonKg,
             isEco: false,
           },
+          totalDistance: ecoDistKm,
+          vehicle: vehicleData,
         });
       }
     } catch (err: any) {
@@ -212,6 +209,30 @@ export default function ComparePage() {
             <SearchBar onSearch={handleSearch} isLoading={isSearching} />
           </div>
 
+          {/* Vehicle Selector */}
+          <div className="glass-panel p-3">
+            <h4 className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Your Vehicle</h4>
+            <div className="grid grid-cols-3 gap-1.5">
+              {VEHICLES.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => setSelectedVehicle(v.id)}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all border ${
+                    selectedVehicle === v.id 
+                      ? 'bg-[rgba(0,255,163,0.1)] border-[var(--neon-green)] text-white shadow-[0_0_8px_rgba(0,255,163,0.15)]' 
+                      : 'bg-[var(--surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-white/20 hover:text-white'
+                  }`}
+                >
+                  <span className="text-sm">{v.icon}</span>
+                  <span className="truncate">{v.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] text-[var(--text-secondary)] mt-2">
+              CO₂ Factor: <span className="text-white font-semibold">{VEHICLES.find(v => v.id === selectedVehicle)?.factor} kg/km</span>
+            </p>
+          </div>
+
           {error && (
             <div className="bg-[rgba(255,100,100,0.1)] border border-red-500/50 p-3 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
               <p className="text-red-400 text-xs font-medium flex items-center gap-2">
@@ -223,6 +244,21 @@ export default function ComparePage() {
 
           {results && (
             <div className="mt-2 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              
+              {/* Trip Summary */}
+              <div className="glass-panel p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Total Distance</p>
+                  <p className="text-2xl font-extrabold text-white">{results.totalDistance.toFixed(1)} <span className="text-sm font-medium text-[var(--text-secondary)]">km</span></p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Vehicle</p>
+                  <p className="text-lg font-bold text-white flex items-center gap-1 justify-end">
+                    <span>{results.vehicle.icon}</span> {results.vehicle.label}
+                  </p>
+                </div>
+              </div>
+
               <CarbonMeter ecoCarbon={results.eco.carbonVal} stdCarbon={results.standard.carbonVal} />
               
               <div className="space-y-3">

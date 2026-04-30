@@ -24,7 +24,7 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
         sources: {
           'raster-tiles': {
             type: 'raster',
-            tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+            tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'],
             tileSize: 256,
             attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
           }
@@ -43,6 +43,12 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
       zoom: 12,
       attributionControl: false
     });
+
+    // Ensure map resizes correctly
+    const resizeObserver = new ResizeObserver(() => {
+      map.current?.resize();
+    });
+    resizeObserver.observe(mapContainer.current);
 
     map.current.on('load', () => {
       if (!map.current) return;
@@ -82,9 +88,21 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
           'line-opacity': 0.5
         }
       });
+
+      // Markers
+      const elOrigin = document.createElement('div');
+      elOrigin.className = 'w-4 h-4 rounded-full bg-white border-2 border-slate-400 shadow-lg';
+      const markerOrigin = new maplibregl.Marker(elOrigin).setLngLat([0, 0]).addTo(map.current);
+
+      const elDest = document.createElement('div');
+      elDest.className = 'w-4 h-4 rounded-full bg-[#00FFA3] border-2 border-black shadow-lg';
+      const markerDest = new maplibregl.Marker(elDest).setLngLat([0, 0]).addTo(map.current);
+
+      (map.current as any)._markers = { origin: markerOrigin, dest: markerDest };
     });
 
     return () => {
+      resizeObserver.disconnect();
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -117,12 +135,19 @@ export default function MapView({ isActive, isSearching, routes }: MapViewProps)
       const bounds = new maplibregl.LngLatBounds();
       ecoCoords.forEach((c: any) => bounds.extend(c as [number, number]));
       map.current.fitBounds(bounds, { padding: 50, duration: 2000 });
+
+      // Update markers
+      const markers = (map.current as any)._markers;
+      if (markers) {
+        markers.origin.setLngLat(ecoCoords[0]);
+        markers.dest.setLngLat(ecoCoords[ecoCoords.length - 1]);
+      }
     }
   }, [routes]);
 
   return (
     <div className="w-full h-full relative">
-      <div ref={mapContainer} className="absolute inset-0" />
+      <div ref={mapContainer} className="w-full h-full absolute inset-0" />
       
       {isSearching && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[var(--surface-glass)] backdrop-blur-sm">

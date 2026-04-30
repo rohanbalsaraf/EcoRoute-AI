@@ -174,21 +174,23 @@ def calculate_route(request: RouteRequest):
         raise HTTPException(status_code=503, detail="Routing engine not initialized")
 
     try:
-        # 0. On-demand ingestion: If the request is far from our current graph center, fetch new OSM data
-        start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
-        lat_node, lon_node = graph_store.graph.get_node_coords(start_node)
+        # 0. On-demand ingestion
+        start_node_temp = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
+        lat_start, lon_start = graph_store.graph.get_node_coords(start_node_temp)
+        end_node_temp = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
+        lat_end, lon_end = graph_store.graph.get_node_coords(end_node_temp)
         
-        dist_sq = (lat_node - request.origin_lat)**2 + (lon_node - request.origin_lon)**2
-        if dist_sq > 0.02: # increased threshold to ~15km
-            print(f"🌍 New area detected! Ingesting OSM data for {request.origin_lat}, {request.origin_lon}...")
-            success = graph_store.update_graph_for_area(request.origin_lat, request.origin_lon)
-            if not success:
-                print("⚠️ Ingestion failed, attempting to proceed with current graph...")
-            else:
-                start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
-                end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
+        dist_sq_origin = (lat_start - request.origin_lat)**2 + (lon_start - request.origin_lon)**2
+        dist_sq_dest = (lat_end - request.dest_lat)**2 + (lon_end - request.dest_lon)**2
+        
+        if dist_sq_origin > 0.02 or dist_sq_dest > 0.02:
+            print(f"🌍 Long route or new area detected! Ingesting OSM data...")
+            graph_store.update_graph_for_area(
+                request.origin_lat, request.origin_lon,
+                request.dest_lat, request.dest_lon
+            )
 
-        # 1. Map GPS coordinates to nearest graph nodes
+        # 1. Final Snap
         start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
         end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
 
@@ -198,7 +200,7 @@ def calculate_route(request: RouteRequest):
             routes_json = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, request.vehicle)
         except Exception as e:
             if "No path found" in str(e):
-                raise HTTPException(status_code=404, detail=f"No path found between these locations in the current map data. Try searching for locations within 10km of each other.")
+                raise HTTPException(status_code=404, detail="No road path found between these locations in the current OSM data.")
             raise e
         routes_data = json.loads(routes_json)
 

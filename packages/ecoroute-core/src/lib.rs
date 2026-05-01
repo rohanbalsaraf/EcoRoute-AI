@@ -8,6 +8,7 @@ pub mod carbon;          // Vehicle, carbon_cost, travel_time_minutes
 pub mod heuristic;       // haversine, carbon_heuristic, time_heuristic
 pub mod priority_queue;  // State (min-heap ordering)
 pub mod algorithm;       // green_dijkstra, gdawa_star, find_all_routes
+pub mod rl_agent;        // Q-Learning Carbon Agent
 pub mod python;          // PyO3 bindings
 
 pub use carbon::Vehicle;

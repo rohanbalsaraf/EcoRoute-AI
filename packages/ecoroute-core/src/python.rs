@@ -63,9 +63,47 @@ pub fn calculate_routes(
         .map_err(|e| PyRuntimeError::new_err(format!("Failed to serialize routes: {}", e)))
 }
 
+#[pyclass]
+pub struct PyCarbonAgent {
+    pub inner: crate::rl_agent::CarbonAgent,
+}
+
+#[pymethods]
+impl PyCarbonAgent {
+    #[new]
+    pub fn new() -> Self {
+        PyCarbonAgent {
+            inner: crate::rl_agent::CarbonAgent::new(),
+        }
+    }
+
+    pub fn predict_penalty(&self, current_speed: f64, speed_limit: f64, num_signals: u32, gradient: f64) -> f64 {
+        let state = crate::rl_agent::SegmentState::from_edge(current_speed, speed_limit, num_signals, gradient);
+        self.inner.predict_penalty(&state)
+    }
+
+    pub fn update(&mut self, current_speed: f64, speed_limit: f64, num_signals: u32, gradient: f64, realized_ratio: f64) {
+        let state = crate::rl_agent::SegmentState::from_edge(current_speed, speed_limit, num_signals, gradient);
+        self.inner.update(state, realized_ratio);
+    }
+
+    pub fn save_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to serialize agent: {}", e)))
+    }
+
+    #[staticmethod]
+    pub fn load_json(json: String) -> PyResult<Self> {
+        let inner = serde_json::from_str(&json)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to parse agent: {}", e)))?;
+        Ok(PyCarbonAgent { inner })
+    }
+}
+
 #[pymodule]
 fn ecoroute_core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyRoadGraph>()?;
+    m.add_class::<PyCarbonAgent>()?;
     m.add_function(wrap_pyfunction!(calculate_routes, m)?)?;
     Ok(())
 }

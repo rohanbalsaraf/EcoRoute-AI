@@ -1,0 +1,18 @@
+[project]
+name = "ecoroute-agent"
+version = "0.1.0"
+description = "AI Routing Assistant for EcoRoute"
+dependencies = [
+    "ecoroute",
+    "langchain>=0.1.0",
+    "langchain-openai>=0.0.8",
+    "langchain-anthropic>=0.1.1",
+    "mcp-server>=0.1.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+]

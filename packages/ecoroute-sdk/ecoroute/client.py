@@ -47,9 +47,11 @@ class EcoRouteClient:
 
     def __init__(
         self,
+        api_url:           Optional[str] = None,
         openaq_api_key:    Optional[str] = None,
         openweather_api_key: Optional[str] = None,
     ) -> None:
+        self.api_url    = api_url or os.getenv("ECOROUTE_API_URL")
         self._geocoder  = GeocodingClient()
         self._aqi       = AQIClient(api_key=openaq_api_key)
         self._weather   = WeatherClient()
@@ -67,32 +69,24 @@ class EcoRouteClient:
     ) -> Optional[RouteResponse]:
         """
         Find greenest, fastest, and shortest routes between two points.
-
-        Args:
-            origin:      Place name ("Pune Station") or Coordinate
-            destination: Place name ("Hinjewadi") or Coordinate
-            vehicle:     "petrol" | "diesel" | "cng" | "hybrid" | "ev"
-
-        Returns:
-            RouteResponse with greenest, fastest, shortest routes
-            and carbon savings comparison.
         """
         # Resolve vehicle type
         if isinstance(vehicle, str):
             vehicle = VehicleType(vehicle.lower())
 
-        # Geocode origin and destination if strings
+        # Resolve coordinates
         origin_wp = await self._resolve_location(origin)
         dest_wp   = await self._resolve_location(destination)
 
         if origin_wp is None or dest_wp is None:
-            print("Could not geocode one or both locations.")
             return None
 
-        # Build a simple graph using OSRM waypoints
-        # In production this uses the full OSM graph loaded from disk
-        # For the SDK demo we build a small local graph
-        nodes, adjacency = await self._build_local_graph(
+        # OPTION A: Call Remote EcoRoute API (Production Mode)
+        if self.api_url:
+            return await self._fetch_remote_routes(origin_wp, dest_wp, vehicle)
+
+        # OPTION B: Build Local Graph from OSRM (SDK Mode)
+        nodes, adjacency = await self._build_real_graph(
             origin_wp.coordinate,
             dest_wp.coordinate,
             vehicle,
@@ -101,18 +95,40 @@ class EcoRouteClient:
         if not nodes:
             return None
 
-        start = 0
-        end   = len(nodes) - 1
-
         return self._optimizer.find_routes(
             nodes      = nodes,
             adjacency  = adjacency,
-            start      = start,
-            end        = end,
+            start      = 0,
+            end        = len(nodes) - 1,
             vehicle    = vehicle,
             origin_wp  = origin_wp,
             dest_wp    = dest_wp,
         )
+
+    async def _fetch_remote_routes(
+        self, origin: Waypoint, dest: Waypoint, vehicle: VehicleType
+    ) -> Optional[RouteResponse]:
+        """Call the production EcoRoute API."""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.api_url}/routes",
+                    params={
+                        "origin":      f"{origin.coordinate.lat},{origin.coordinate.lon}",
+                        "destination": f"{dest.coordinate.lat},{dest.coordinate.lon}",
+                        "vehicle":     vehicle.value,
+                    },
+                    timeout=30.0
+                )
+                if response.status_code != 200:
+                    return None
+                
+                # The API returns a similar structure to RouteResponse
+                # In a real implementation we would parse the JSON into Pydantic models
+                data = response.json()
+                return RouteResponse.model_validate(data)
+            except Exception:
+                return None
 
     # ----------------------------------------------------------------
     # find_routes_sync — convenience wrapper for non-async code
@@ -162,112 +178,78 @@ class EcoRouteClient:
             return Waypoint(name=name or "Unknown", coordinate=location)
         return await self._geocoder.geocode(location)
 
-    async def _build_local_graph(
+    async def _build_real_graph(
         self,
         origin:      Coordinate,
         destination: Coordinate,
         vehicle:     VehicleType,
     ) -> tuple[list[PyNode], list[list[PyEdge]]]:
         """
-        Build a minimal graph with real AQI and weather data.
-
-        In production this loads the full pre-built OSM graph.
-        Here we create a simplified 4-node graph using:
-          - OSRM for distance/time
-          - OpenAQ for live AQI
-          - Open-Meteo for weather
+        Build a real routing graph by fetching a base route from OSRM
+        and then augmenting the edges with live environmental data.
         """
-        # Fetch live data concurrently
-        try:
-            aqi_origin, aqi_dest, weather = await asyncio.gather(
-                self._aqi.get_aqi(origin.lat, origin.lon),
-                self._aqi.get_aqi(destination.lat, destination.lon),
-                self._weather.get_weather(
-                    (origin.lat + destination.lat) / 2,
-                    (origin.lon + destination.lon) / 2,
-                ),
-                return_exceptions=True,
-            )
-        except Exception:
-            aqi_origin = aqi_dest = weather = None
+        # Fetch base route with steps
+        raw_osrm = await self._osrm.get_route(origin, destination)
+        if not raw_osrm:
+            return [], []
 
-        # Weather fuel penalty
-        weather_penalty = 1.0
-        if hasattr(weather, "fuel_penalty"):
-            weather_penalty = weather.fuel_penalty()  # type: ignore
+        steps = raw_osrm.get("steps", [])
+        if not steps:
+            return [], []
 
-        # AQI scaling (higher pollution = higher carbon multiplier)
-        aqi_factor_origin = 1.0
-        aqi_factor_dest   = 1.0
-        if hasattr(aqi_origin, "aqi_index"):
-            aqi_factor_origin = 1.0 + (aqi_origin.aqi_index / 500.0) * 0.2  # type: ignore
-        if hasattr(aqi_dest, "aqi_index"):
-            aqi_factor_dest = 1.0 + (aqi_dest.aqi_index / 500.0) * 0.2  # type: ignore
-
-        # Straight line distance and midpoint
-        total_dist = _haversine(
-            origin.lat, origin.lon,
-            destination.lat, destination.lon,
-        )
+        # Concurrent data fetching for midpoint
         mid_lat = (origin.lat + destination.lat) / 2
         mid_lon = (origin.lon + destination.lon) / 2
+        
+        weather, aqi = await asyncio.gather(
+            self._weather.get_weather(mid_lat, mid_lon),
+            self._aqi.get_aqi(mid_lat, mid_lon),
+            return_exceptions=True
+        )
 
-        # Build 4-node graph:
-        # 0=origin → 1=midpoint_clean → 2=midpoint_congested → 3=destination
-        nodes = [
-            PyNode(0, origin.lat,      origin.lon,      "Origin"),
-            PyNode(1, mid_lat + 0.005, mid_lon,         "Clean route mid"),
-            PyNode(2, mid_lat - 0.005, mid_lon,         "Congested mid"),
-            PyNode(3, destination.lat, destination.lon, "Destination"),
-        ]
+        weather_penalty = 1.0
+        if isinstance(weather, WeatherData):
+            weather_penalty = weather.fuel_penalty()
 
-        half = total_dist / 2.0
+        aqi_factor = 1.0
+        if isinstance(aqi, AQIData):
+            aqi_factor = 1.0 + (aqi.aqi_index / 500.0) * 0.2
 
-        adjacency: list[list[PyEdge]] = [
-            # From origin: two alternate mid-points
-            [
-                PyEdge(  # clean, less congested route
-                    to                = 1,
-                    distance_km       = half * 1.15,
-                    speed_limit_kmh   = 60.0,
-                    current_speed_kmh = 45.0 * weather_penalty,
-                    gradient_pct      = 0.2,
-                    num_signals       = 2,
-                ),
-                PyEdge(  # faster but congested route
-                    to                = 2,
-                    distance_km       = half * 0.95,
-                    speed_limit_kmh   = 60.0,
-                    current_speed_kmh = 12.0 * weather_penalty,
-                    gradient_pct      = 1.0,
-                    num_signals       = 6,
-                ),
-            ],
-            # From clean mid → destination
-            [
-                PyEdge(
-                    to                = 3,
-                    distance_km       = half * 1.10,
-                    speed_limit_kmh   = 60.0,
-                    current_speed_kmh = 48.0 * weather_penalty,
-                    gradient_pct      = 0.1,
-                    num_signals       = 1,
-                ),
-            ],
-            # From congested mid → destination
-            [
-                PyEdge(
-                    to                = 3,
-                    distance_km       = half * 0.90,
-                    speed_limit_kmh   = 60.0,
-                    current_speed_kmh = 10.0 * weather_penalty,
-                    gradient_pct      = 0.8,
-                    num_signals       = 5,
-                ),
-            ],
-            # Destination — no outgoing edges
-            [],
-        ]
+        # Convert OSRM steps to graph nodes and edges
+        nodes: list[PyNode] = []
+        adjacency: list[list[PyEdge]] = []
+
+        # Start with origin
+        nodes.append(PyNode(0, origin.lat, origin.lon, "Start"))
+        adjacency.append([])
+
+        for i, step in enumerate(steps):
+            loc = step.get("maneuver", {}).get("location", [0, 0])
+            name = step.get("name", f"Step {i}")
+            
+            node_id = i + 1
+            nodes.append(PyNode(node_id, loc[1], loc[0], name))
+            adjacency.append([])
+
+            # Create edge from previous node to this one
+            dist = step.get("distance", 0) / 1000.0
+            duration = step.get("duration", 1) / 60.0
+            
+            # Estimate speed
+            speed = (dist / (duration / 60.0)) if duration > 0 else 30.0
+            
+            # Simple heuristic for signals (OSRM often marks them in 'intersections')
+            num_signals = len(step.get("intersections", [])) // 2 
+
+            edge = PyEdge(
+                to                = node_id,
+                distance_km       = dist,
+                speed_limit_kmh   = speed * 1.2, # assume limit is slightly higher
+                current_speed_kmh = speed * weather_penalty,
+                gradient_pct      = 0.0, # would need DEM for real gradient
+                num_signals       = num_signals,
+            )
+            adjacency[i].append(edge)
 
         return nodes, adjacency
 

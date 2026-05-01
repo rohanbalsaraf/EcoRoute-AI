@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@clerk/nextjs";
 import SearchBar from "../../components/SearchBar";
@@ -363,6 +364,29 @@ export default function ComparePage() {
                   <RouteCard data={results.standard} />
                 </div>
               </div>
+
+              {!isSignedIn && (
+                <div className="mt-4 glass-panel p-4 border-[var(--border-glow-green)] bg-[rgba(0,255,163,0.05)] animate-in fade-in slide-in-from-bottom-2 duration-700">
+                  <h4 className="text-sm font-bold text-white mb-2">Want to automate this?</h4>
+                  <p className="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed">
+                    Get your own **API Key** to integrate carbon-aware routing into your own software. Logged-in users get:
+                  </p>
+                  <ul className="text-[11px] text-white/80 space-y-2 mb-4">
+                    <li className="flex items-center gap-2">
+                      <span className="text-[var(--neon-green)]">✓</span> 100 free requests per day
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-[var(--neon-green)]">✓</span> Personal Analytics Dashboard
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-[var(--neon-green)]">✓</span> Commercial usage license
+                    </li>
+                  </ul>
+                  <Link href="/sign-up" className="btn-primary w-full text-center py-2 text-xs block">
+                    Get Started for Free
+                  </Link>
+                </div>
+              )}
             </div>
           )}
         </div>

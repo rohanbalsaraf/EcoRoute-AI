@@ -174,24 +174,36 @@ def get_dashboard_stats(user: UserSchema = Depends(get_current_user), db: Sessio
     
     # For a real implementation, you might sum the usage directly from Redis
     current_day = int(time.time() // 86400)
-    redis_key = f"rate_limit:{user.id}:{current_day}"
-    
-    usage_count = 0
-    if redis_client:
-        usage = redis_client.get(redis_key)
-        usage_count = int(usage) if usage else 0
-    else:
-        usage_count = in_memory_rate_limit.get(redis_key, 0)
     
     # Get user's tier
     sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
     tier = sub.tier if sub and sub.status == "active" else "free"
     
+    # Get usage for the last 7 days
+    daily_usage = []
+    for i in range(7):
+        day = current_day - i
+        day_key = f"rate_limit:{user.id}:{day}"
+        count = 0
+        if redis_client:
+            val = redis_client.get(day_key)
+            count = int(val) if val else 0
+        else:
+            count = in_memory_rate_limit.get(day_key, 0)
+        
+        # Format date as 'May 01'
+        date_str = time.strftime("%b %d", time.localtime(day * 86400))
+        daily_usage.append({"date": date_str, "calls": count})
+    
+    daily_usage.reverse() # Show oldest to newest
+    usage_count = sum(d["calls"] for d in daily_usage)
+    
     return {
         "user_id": user.id,
-        "api_calls_this_month": usage_count, # Simplified for demo, normally tracked per month
+        "api_calls_this_month": usage_count,
         "tier": tier.capitalize(),
-        "limit": RATE_LIMITS.get(tier, RATE_LIMITS["free"])["requests"]
+        "limit": RATE_LIMITS.get(tier, RATE_LIMITS["free"])["requests"],
+        "daily_usage": daily_usage
     }
 
 @app.post("/internal/dashboard/api-keys", dependencies=[Depends(get_current_user)])

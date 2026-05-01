@@ -1,8 +1,12 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import { useAuth } from "@clerk/nextjs";
-import { toast } from "sonner";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts';
 
 export default function DashboardStats() {
   const { getToken } = useAuth();
@@ -34,36 +38,19 @@ export default function DashboardStats() {
 
   if (loading) {
     return (
-      <div className="glass-panel p-4 md:col-span-3 bg-[var(--surface-glass)]">
-        <div className="flex justify-between items-center mb-6">
-          <div className="h-6 w-32 skeleton"></div>
-          <div className="h-5 w-20 skeleton"></div>
-        </div>
-        
-        <div className="space-y-4">
-          <div className="flex justify-between">
-            <div className="h-3 w-24 skeleton"></div>
-            <div className="h-3 w-16 skeleton"></div>
-          </div>
-          <div className="h-1.5 w-full skeleton"></div>
-        </div>
-        
-        <div className="mt-8 flex justify-between items-center border-t border-[var(--border-subtle)] pt-4">
-          <div className="h-8 w-28 skeleton rounded-md"></div>
-          <div className="h-4 w-24 skeleton"></div>
-        </div>
+      <div className="glass-panel p-6 md:col-span-3 bg-[var(--surface-glass)]">
+        <div className="h-6 w-32 skeleton mb-8"></div>
+        <div className="h-48 w-full skeleton rounded-xl"></div>
       </div>
     );
   }
 
   if (!stats) {
     return (
-      <div className="glass-panel p-4 md:col-span-3 bg-[var(--surface-glass)]">
+      <div className="glass-panel p-6 md:col-span-3 bg-[var(--surface-glass)]">
         <p className="text-red-400 text-sm font-medium flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Analytics unavailable. Ensure NEXT_PUBLIC_API_URL is set correctly.
+          Analytics unavailable. Check API connection.
         </p>
-        <p className="text-[10px] text-gray-600 mt-1">Target: {API_URL}</p>
       </div>
     );
   }
@@ -71,18 +58,61 @@ export default function DashboardStats() {
   const usagePercentage = Math.min(100, (stats.api_calls_this_month / stats.limit) * 100);
 
   return (
-    <div className="glass-panel p-4 md:col-span-3 bg-[var(--surface-glass)]">
-      <div className="flex justify-between items-start mb-6">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Usage & Billing</h2>
+    <div className="glass-panel p-6 md:col-span-3 bg-[var(--surface-glass)]">
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Usage History</h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">API calls over the last 7 days</p>
+        </div>
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${stats.tier === "Pro" ? "bg-[var(--neon-purple)] text-white" : "bg-[var(--neon-green)] text-black"}`}>
           {stats.tier} Tier
         </span>
       </div>
 
+      {/* Chart Section */}
+      <div className="h-48 w-full mb-8">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={stats.daily_usage}>
+            <defs>
+              <linearGradient id="colorCalls" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--neon-green)" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="var(--neon-green)" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <XAxis 
+              dataKey="date" 
+              axisLine={false} 
+              tickLine={false} 
+              tick={{ fill: 'var(--text-secondary)', fontSize: 10 }}
+              dy={10}
+            />
+            <YAxis hide />
+            <Tooltip 
+              contentStyle={{ 
+                backgroundColor: 'var(--surface)', 
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '8px',
+                fontSize: '12px'
+              }}
+              itemStyle={{ color: 'var(--neon-green)' }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="calls" 
+              stroke="var(--neon-green)" 
+              fillOpacity={1} 
+              fill="url(#colorCalls)" 
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
       <div className="space-y-6">
         <div>
           <div className="flex justify-between text-xs mb-2">
-            <span className="text-[var(--text-secondary)]">Monthly API Calls</span>
+            <span className="text-[var(--text-secondary)]">Total usage (Last 7 days)</span>
             <span className="text-[var(--text-primary)] font-bold">{stats.api_calls_this_month} / {stats.limit}</span>
           </div>
           <div className="w-full bg-[var(--surface)] rounded-full h-1.5 relative overflow-hidden">
@@ -91,41 +121,27 @@ export default function DashboardStats() {
               style={{ width: `${usagePercentage}%` }}
             ></div>
           </div>
-          {usagePercentage > 90 && (
-            <p className="text-[10px] text-red-400 mt-2 font-medium">Approaching daily limit. Consider upgrading.</p>
-          )}
         </div>
       </div>
       
-      <div className="mt-6 flex justify-between items-center border-t border-[var(--border-subtle)] pt-4">
-        {stats.tier !== "Pro" ? (
+      <div className="mt-8 flex justify-between items-center border-t border-[var(--border-subtle)] pt-4">
+        {stats.tier !== "Pro" && (
           <button 
             onClick={async () => {
-              try {
-                const res = await fetch("/api/checkout", { method: "POST" });
-                const data = await res.json();
-                if (data.url) {
-                  window.location.href = data.url;
-                } else {
-                  toast.error("Failed to initiate checkout: " + (data.error || "Unknown error"));
-                }
-              } catch (e) {
-                console.error(e);
-                toast.error("Error connecting to checkout service.");
-              }
+              const res = await fetch("/api/checkout", { method: "POST" });
+              const data = await res.json();
+              if (data.url) window.location.href = data.url;
             }}
-            className="btn-primary text-xs"
+            className="btn-primary py-2 px-4 text-xs font-bold"
           >
             Upgrade to Pro
           </button>
-        ) : (
-          <div></div> // Spacer
         )}
         <a 
           href="https://app.lemonsqueezy.com/my-orders"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[var(--neon-green)] hover:underline text-xs font-medium"
+          className="text-[var(--text-secondary)] hover:text-[var(--neon-green)] text-xs transition-colors"
         >
           Manage Billing &rarr;
         </a>

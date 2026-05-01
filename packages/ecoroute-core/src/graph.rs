@@ -64,6 +64,7 @@ impl RoadGraph {
     }
 
     // Update live speed — called every 5 min by traffic merger
+    #[allow(dead_code)]
     pub fn update_speed(&mut self, from: usize, to: usize, new_speed_kmh: f64) {
         if let Some(edge) = self.adjacency[from].iter_mut().find(|e| e.to == to) {
             edge.current_speed_kmh = new_speed_kmh;
@@ -72,6 +73,7 @@ impl RoadGraph {
 
     // Find nearest node to a GPS coordinate — O(n) brute force
     // Replace with KD-tree for production
+    #[allow(dead_code)]
     pub fn nearest_node(&self, lat: f64, lon: f64) -> usize {
         use crate::heuristic::haversine;
         self.nodes
@@ -102,6 +104,7 @@ pub struct RouteResult {
 #[derive(Debug)]
 pub struct SavingsEquivalents {
     pub smartphones_charged:   f64,
+    #[allow(dead_code)]
     pub trees_days_equivalent: f64,
     pub km_not_driven:         f64,
 }

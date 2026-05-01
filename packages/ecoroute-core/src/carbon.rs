@@ -54,6 +54,7 @@ impl Vehicle {
     }
 
     // Human readable label
+    #[allow(dead_code)]
     pub fn label(&self) -> &str {
         match self {
             Vehicle::Petrol => "Petrol",

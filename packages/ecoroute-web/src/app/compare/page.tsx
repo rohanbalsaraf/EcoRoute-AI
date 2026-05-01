@@ -83,23 +83,50 @@ async function fetchValhallaWithCosting(
   };
 }
 
-// Fetch dual routes: eco-friendly vs standard
+// Fetch dual routes: eco-friendly (shortest distance) vs standard (fastest)
 async function fetchDualRoutes(
   originLat: number, originLon: number,
   destLat: number, destLon: number
 ): Promise<{ eco: RouteGeometry; standard: RouteGeometry }> {
-  // Eco: avoid highways, prefer shorter distance, penalize tolls
-  const ecoOptions = { use_highways: 0.1, use_tolls: 0.1, top_speed: 80 };
-  // Standard: prefer highways and fastest path
-  const stdOptions = { use_highways: 1.0, use_tolls: 0.5 };
+  const locations = [
+    { lat: originLat, lon: originLon },
+    { lat: destLat, lon: destLon }
+  ];
 
-  // Fetch both routes in parallel
-  const [eco, standard] = await Promise.all([
-    fetchValhallaWithCosting(originLat, originLon, destLat, destLon, ecoOptions),
-    fetchValhallaWithCosting(originLat, originLon, destLat, destLon, stdOptions),
+  // Route A: shortest distance (eco — less fuel burned)
+  const bodyA = JSON.stringify({ locations, costing: "auto_shorter", units: "kilometers" });
+  // Route B: fastest time (standard — uses highways)
+  const bodyB = JSON.stringify({ locations, costing: "auto", units: "kilometers" });
+
+  const [resA, resB] = await Promise.all([
+    fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(bodyA)}`, { signal: AbortSignal.timeout(20000) }),
+    fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(bodyB)}`, { signal: AbortSignal.timeout(20000) }),
   ]);
 
-  return { eco, standard };
+  if (!resA.ok || !resB.ok) throw new Error(`Routing error (${resA.status}/${resB.status})`);
+  const [dataA, dataB] = await Promise.all([resA.json(), resB.json()]);
+
+  if (!dataA.trip?.legs?.length || !dataB.trip?.legs?.length) {
+    throw new Error('Could not find driving routes.');
+  }
+
+  const routeA: RouteGeometry = {
+    coordinates: decodePolyline(dataA.trip.legs[0].shape),
+    distance_km: dataA.trip.summary.length,
+    duration_min: dataA.trip.summary.time / 60,
+  };
+  const routeB: RouteGeometry = {
+    coordinates: decodePolyline(dataB.trip.legs[0].shape),
+    distance_km: dataB.trip.summary.length,
+    duration_min: dataB.trip.summary.time / 60,
+  };
+
+  // The shorter-distance route is eco (less fuel), the faster one is standard
+  if (routeA.distance_km <= routeB.distance_km) {
+    return { eco: routeA, standard: routeB };
+  } else {
+    return { eco: routeB, standard: routeA };
+  }
 }
 
 // Fallback: OSRM (single route)

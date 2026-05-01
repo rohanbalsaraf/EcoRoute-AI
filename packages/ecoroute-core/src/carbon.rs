@@ -66,6 +66,12 @@ impl Vehicle {
     }
 }
 
+// Physics & Environmental Constants
+const GRADIENT_UPHILL_FACTOR: f64 = 0.03;   // 3% penalty per 1% slope
+const GRADIENT_DOWNHILL_FACTOR: f64 = 0.01; // 1% recovery per 1% slope
+const AVG_SIGNAL_WAIT_SECONDS: f64 = 45.0;
+const MAX_ACCEL_PENALTY: f64 = 0.5;         // Up to 50% extra fuel in congestion
+
 // ----------------------------------------------------------------
 // carbon_cost — kg CO2 for one vehicle on one road segment
 //
@@ -76,34 +82,24 @@ impl Vehicle {
 // ----------------------------------------------------------------
 pub fn carbon_cost(edge: &Edge, vehicle: &Vehicle) -> f64 {
     // --- gradient penalty ---
-    // every 1% uphill slope = 3% more fuel
-    // downhill gives slight recovery (not full regen)
     let gradient_penalty = if edge.gradient_pct > 0.0 {
-        1.0 + (edge.gradient_pct * 0.03)
+        1.0 + (edge.gradient_pct * GRADIENT_UPHILL_FACTOR)
     } else if edge.gradient_pct < 0.0 {
-        1.0 + (edge.gradient_pct * 0.01)
+        1.0 + (edge.gradient_pct * GRADIENT_DOWNHILL_FACTOR)
     } else {
         1.0
     };
 
     // --- acceleration penalty from stop-go traffic ---
     // speed_ratio = how much of speed limit is actually being used
-    // low ratio = heavy congestion = repeated braking + accelerating
     let speed_ratio = if edge.speed_limit_kmh > 0.0 {
         (edge.current_speed_kmh / edge.speed_limit_kmh).clamp(0.0, 1.0)
     } else {
         1.0
     };
 
-    let accel_penalty = if speed_ratio < 0.3 {
-        1.50  // severe congestion — 50% extra fuel
-    } else if speed_ratio < 0.5 {
-        1.25  // moderate congestion — 25% extra fuel
-    } else if speed_ratio < 0.7 {
-        1.10  // light congestion — 10% extra fuel
-    } else {
-        1.00  // free flow — no penalty
-    };
+    // Continuous penalty function: 1.0 at free flow, 1.5 at dead stop
+    let accel_penalty = 1.0 + MAX_ACCEL_PENALTY * (1.0 - speed_ratio).powi(2);
 
     // --- fuel burned while moving ---
     let moving_fuel = edge.distance_km
@@ -112,8 +108,7 @@ pub fn carbon_cost(edge: &Edge, vehicle: &Vehicle) -> f64 {
         * accel_penalty;
 
     // --- fuel burned idling at red lights ---
-    // average red light wait = 45 seconds per signal
-    let idle_time_hours = (edge.num_signals as f64 * 45.0) / 3600.0;
+    let idle_time_hours = (edge.num_signals as f64 * AVG_SIGNAL_WAIT_SECONDS) / 3600.0;
     let idle_fuel = idle_time_hours * vehicle.idle_consumption_per_hour();
 
     // --- convert fuel to carbon ---
@@ -131,7 +126,7 @@ pub fn travel_time_minutes(edge: &Edge) -> f64 {
         5.0 // crawling in jam
     };
     let moving_min = (edge.distance_km / speed) * 60.0;
-    let signal_min = (edge.num_signals as f64 * 45.0) / 60.0;
+    let signal_min = (edge.num_signals as f64 * AVG_SIGNAL_WAIT_SECONDS) / 60.0;
     moving_min + signal_min
 }
 

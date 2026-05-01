@@ -173,12 +173,33 @@ def calculate_route(request: RouteRequest, api_key_data: dict = Depends(verify_a
         # 2. Call the Rust engine
         import ecoroute_core
         try:
-            routes_json = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, request.vehicle)
+            routes = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, request.vehicle)
         except Exception as e:
             if "No path found" in str(e):
                 raise HTTPException(status_code=404, detail="No road path found between these locations in the current OSM data.")
             raise e
-        routes_data = json.loads(routes_json)
+        
+        # Convert native Rust object to dictionary for JSON response
+        routes_data = {
+            "greenest": {
+                "path": routes.greenest.path,
+                "total_carbon_kg": routes.greenest.total_carbon_kg,
+                "total_distance_km": routes.greenest.total_distance_km,
+                "total_time_min": routes.greenest.total_time_min,
+            },
+            "fastest": {
+                "path": routes.fastest.path,
+                "total_carbon_kg": routes.fastest.total_carbon_kg,
+                "total_distance_km": routes.fastest.total_distance_km,
+                "total_time_min": routes.fastest.total_time_min,
+            },
+            "shortest": {
+                "path": routes.shortest.path,
+                "total_carbon_kg": routes.shortest.total_carbon_kg,
+                "total_distance_km": routes.shortest.total_distance_km,
+                "total_time_min": routes.shortest.total_time_min,
+            }
+        }
 
         # 3. Hydrate path nodes with coordinates for mapping
         def hydrate_path(node_ids):

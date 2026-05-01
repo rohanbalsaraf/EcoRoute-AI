@@ -1,14 +1,12 @@
-// ================================================================
-// ecoroute-core/src/graph.rs
-// Core data structures: Node, Edge, RoadGraph, RouteResult
-// ================================================================
-
+use pyo3::prelude::*;
 use serde::{Serialize, Deserialize};
+use kdtree::KdTree;
+use kdtree::distance::squared_euclidean;
 
 // ----------------------------------------------------------------
 // Node — one intersection or point on the road network
 // ----------------------------------------------------------------
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromPyObject)]
 pub struct Node {
     pub id:  usize,
     pub lat: f64,
@@ -18,7 +16,7 @@ pub struct Node {
 // ----------------------------------------------------------------
 // Edge — one road segment connecting two nodes
 // ----------------------------------------------------------------
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromPyObject)]
 pub struct Edge {
     pub to:                usize,
     pub distance_km:       f64,
@@ -31,7 +29,8 @@ pub struct Edge {
 // ----------------------------------------------------------------
 // OptimizeFor — what weight the algorithm minimises
 // ----------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[pyclass(eq, eq_int)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum OptimizeFor {
     Carbon,    // lowest CO2  — green route
     Time,      // lowest time — fastest route
@@ -44,11 +43,16 @@ pub enum OptimizeFor {
 pub struct RoadGraph {
     pub nodes:     Vec<Node>,
     pub adjacency: Vec<Vec<Edge>>,
+    pub tree:      KdTree<f64, usize, [f64; 2]>,
 }
 
 impl RoadGraph {
     pub fn new(nodes: Vec<Node>, adjacency: Vec<Vec<Edge>>) -> Self {
-        Self { nodes, adjacency }
+        let mut tree = KdTree::new(2);
+        for node in &nodes {
+            let _ = tree.add([node.lat, node.lon], node.id);
+        }
+        Self { nodes, adjacency, tree }
     }
 
     pub fn node_count(&self) -> usize {
@@ -71,17 +75,12 @@ impl RoadGraph {
         }
     }
 
-    // Find nearest node to a GPS coordinate — O(n) brute force
-    // Replace with KD-tree for production
-    #[allow(dead_code)]
+    // Find nearest node to a GPS coordinate — O(log n) via KD-Tree
     pub fn nearest_node(&self, lat: f64, lon: f64) -> usize {
-        use crate::heuristic::haversine;
-        self.nodes
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (i, haversine(lat, lon, n.lat, n.lon)))
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .map(|(i, _)| i)
+        self.tree
+            .nearest(&[lat, lon], 1, &squared_euclidean)
+            .ok()
+            .and_then(|results| results.first().map(|&(_, &id)| id))
             .unwrap_or(0)
     }
 }
@@ -89,6 +88,7 @@ impl RoadGraph {
 // ----------------------------------------------------------------
 // RouteResult — returned by the algorithm
 // ----------------------------------------------------------------
+#[pyclass(get_all)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouteResult {
     pub path:              Vec<usize>,
@@ -101,6 +101,7 @@ pub struct RouteResult {
 // ----------------------------------------------------------------
 // SavingsEquivalents — human readable CO2 comparisons
 // ----------------------------------------------------------------
+#[pyclass(get_all)]
 #[derive(Debug)]
 pub struct SavingsEquivalents {
     pub smartphones_charged:   f64,
@@ -122,6 +123,7 @@ impl RouteResult {
 // ----------------------------------------------------------------
 // AllRoutes — three-route comparison shown to users
 // ----------------------------------------------------------------
+#[pyclass(get_all)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AllRoutes {
     pub greenest: RouteResult,

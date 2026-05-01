@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "sonner";
 
 export default function ApiKeyManager() {
   const { getToken } = useAuth();
@@ -48,9 +49,11 @@ export default function ApiKeyManager() {
         const data = await res.json();
         setNewKey({ raw: data.api_key, display: data.display_key });
         await fetchKeys(); // Refresh the list
+        toast.success("New API key generated!");
       }
     } catch (error) {
       console.error("Failed to generate key:", error);
+      toast.error("Failed to generate API key.");
     } finally {
       setLoading(false);
     }
@@ -73,12 +76,13 @@ export default function ApiKeyManager() {
             setNewKey(null);
         }
         await fetchKeys();
+        toast.success("API key revoked.");
       } else {
-        alert("Failed to revoke key.");
+        toast.error("Failed to revoke key.");
       }
     } catch (error) {
       console.error("Failed to revoke key:", error);
-      alert("Failed to revoke key.");
+      toast.error("Failed to revoke key.");
     } finally {
       setLoading(false);
     }
@@ -86,7 +90,7 @@ export default function ApiKeyManager() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("Copied to clipboard!");
+    toast.success("Copied to clipboard!");
   };
 
   return (

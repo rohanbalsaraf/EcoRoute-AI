@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 interface SearchBarProps {
   onSearch: (origin: string, destination: string) => void;
@@ -135,7 +136,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
 
   const handleUseGPS = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      toast.error('Geolocation is not supported by your browser.');
       return;
     }
     setGpsLoading(true);
@@ -158,7 +159,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
         setGpsLoading(false);
       },
       (err) => {
-        alert('Could not get your location. Please allow location access.');
+        toast.error('Could not get your location. Please allow location access.');
         setGpsLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }

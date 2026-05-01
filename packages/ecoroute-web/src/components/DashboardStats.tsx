@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "sonner";
 
 export default function DashboardStats() {
   const { getToken } = useAuth();
@@ -33,8 +34,8 @@ export default function DashboardStats() {
 
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-sm border md:col-span-3 h-48 flex items-center justify-center">
-        <p className="text-gray-500">Loading analytics...</p>
+      <div className="glass-panel p-6 rounded-lg border md:col-span-3 h-48 flex items-center justify-center">
+        <p className="text-[var(--text-secondary)]">Loading analytics...</p>
       </div>
     );
   }
@@ -88,11 +89,11 @@ export default function DashboardStats() {
                 if (data.url) {
                   window.location.href = data.url;
                 } else {
-                  alert("Failed to initiate checkout: " + (data.error || "Unknown error"));
+                  toast.error("Failed to initiate checkout: " + (data.error || "Unknown error"));
                 }
               } catch (e) {
                 console.error(e);
-                alert("Error connecting to checkout service.");
+                toast.error("Error connecting to checkout service.");
               }
             }}
             className="btn-primary text-xs"

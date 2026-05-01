@@ -12,6 +12,7 @@ from .auth import get_current_user, verify_api_key, UserSchema
 from .database import get_db
 from .models import User, Subscription
 from . import graph_store
+from .webhooks import router as webhooks_router
 
 app = FastAPI(
     title="EcoRoute API",
@@ -83,73 +84,7 @@ async def rate_limit(request: Request, api_key_data: dict = Depends(verify_api_k
         
     return api_key_data
 
-@app.post("/v1/webhooks/lemonsqueezy")
-async def lemonsqueezy_webhook(
-    request: Request, 
-    x_signature: str = Header(None),
-    db: Session = Depends(get_db)
-):
-    """Handles incoming webhooks from Lemon Squeezy."""
-    if not x_signature:
-        raise HTTPException(status_code=400, detail="Missing signature")
-
-    raw_body = await request.body()
-    
-    # Verify the signature
-    secret = LEMON_SQUEEZY_WEBHOOK_SECRET.encode('utf-8')
-    digest = hmac.new(secret, raw_body, hashlib.sha256).hexdigest()
-    
-    if not hmac.compare_digest(digest, x_signature):
-        print(f"Signature Mismatch - Expected: {digest}, Received: {x_signature}")
-        raise HTTPException(status_code=401, detail="Invalid signature")
-    
-    data = await request.json()
-    event_name = data.get("meta", {}).get("event_name")
-    
-    print(f"Received Lemon Squeezy Event: {event_name}")
-    
-    # Extract data from the webhook payload
-    obj_data = data.get("data", {})
-    attrs = obj_data.get("attributes", {})
-    customer_id = str(attrs.get("customer_id"))
-    
-    # Custom data you pass during checkout creation in Next.js
-    custom_data = data.get("meta", {}).get("custom_data", {})
-    user_id = custom_data.get("user_id") 
-
-    if not user_id:
-        print("Warning: Webhook received but no user_id found in custom_data")
-        return {"status": "ignored"}
-
-    # Find or create the user in our DB (in case they haven't logged in yet but checked out)
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        user = User(id=user_id, email=attrs.get("user_email", f"unknown_{user_id}@example.com"))
-        db.add(user)
-        db.commit()
-
-    # Find or create subscription
-    sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
-    if not sub:
-        sub = Subscription(user_id=user_id, lemon_squeezy_customer_id=customer_id)
-        db.add(sub)
-    
-    sub.lemon_squeezy_customer_id = customer_id
-
-    # Handle specific events to update tier
-    if event_name in ["subscription_created", "subscription_updated"]:
-        status = attrs.get("status")
-        if status in ["active", "on_trial"]:
-            sub.tier = "pro"
-            sub.status = "active"
-            
-    elif event_name in ["subscription_cancelled", "subscription_expired", "subscription_payment_failed"]:
-        sub.tier = "free"
-        sub.status = "canceled" if event_name == "subscription_cancelled" else "past_due"
-        
-    db.commit()
-
-    return {"status": "success"}
+app.include_router(webhooks_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup_event():

@@ -1,29 +1,83 @@
 import os
+import requests
+from jose import jwt
 from fastapi import Depends, HTTPException, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from .database import get_db
 from .models import User, APIKey, Subscription
-import bcrypt
 from pydantic import BaseModel
+from typing import Optional
 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
 
 security = HTTPBearer()
 api_key_header = APIKeyHeader(name="X-API-Key")
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
+# For production, set this to your Clerk Frontend API URL (e.g., https://liked-manatee-55.clerk.accounts.dev)
+CLERK_ISSUER_URL = os.getenv("CLERK_ISSUER_URL", "https://liked-manatee-55.clerk.accounts.dev")
+JWKS_URL = f"{CLERK_ISSUER_URL}/.well-known/jwks.json"
 
 class UserSchema(BaseModel):
     id: str
-    email: str
+    email: Optional[str] = None
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
+# Cache for JWKS
+_jwks_cache = None
+
+def get_jwks():
+    global _jwks_cache
+    if _jwks_cache is None:
+        try:
+            response = requests.get(JWKS_URL)
+            response.raise_for_status()
+            _jwks_cache = response.json()
+        except Exception as e:
+            print(f"Error fetching JWKS: {e}")
+            raise HTTPException(status_code=500, detail="Could not verify authentication")
+    return _jwks_cache
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: Session = Depends(get_db)
+):
     token = credentials.credentials
-    # In a real app, verify the JWT locally using Clerk's JWKS
-    if not token or token == "invalid":
+    if not token:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
     
-    return UserSchema(id="user_123", email="dev@example.com")
+    try:
+        jwks = get_jwks()
+        # Decode and verify the JWT
+        # In a real Clerk token, the 'azp' or 'iss' will match your app
+        payload = jwt.decode(
+            token,
+            jwks,
+            algorithms=["RS256"],
+            audience=None, # Clerk tokens don't always have aud set by default
+            issuer=CLERK_ISSUER_URL
+        )
+        
+        user_id = payload.get("sub")
+        email = payload.get("email") # Note: email might be in extra claims or needs a sync
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token claims")
+            
+        # Verify user exists in our DB (Priority 2 will handle automatic creation)
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            # If user sync hasn't happened yet, we might want to create a stub
+            # but usually the webhook handles this. For now, let's just return the schema.
+            return UserSchema(id=user_id, email=email)
+            
+        return UserSchema(id=user.id, email=user.email)
+        
+    except Exception as e:
+        print(f"JWT Verification failed: {e}")
+        # If JWKS failed once, clear cache to retry on next request
+        global _jwks_cache
+        _jwks_cache = None
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 async def verify_api_key(
     api_key: str = Security(api_key_header), 

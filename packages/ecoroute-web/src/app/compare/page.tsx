@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import { useAuth } from "@clerk/nextjs";
 import SearchBar from "../../components/SearchBar";
 import MapView from "../../components/MapView";
@@ -248,6 +249,7 @@ export default function ComparePage() {
       try {
         const dualRoutes = await fetchDualRoutes(origin.lat, origin.lon, dest.lat, dest.lon);
         setRawRoutes(dualRoutes);
+        toast.success("Optimal routes found!");
       } catch (e) {
         console.warn('Valhalla dual-route failed, trying OSRM fallback:', e);
         // Fallback: single OSRM route with simulated difference

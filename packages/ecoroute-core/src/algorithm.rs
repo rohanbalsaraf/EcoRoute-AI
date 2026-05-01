@@ -11,7 +11,7 @@
 use std::collections::BinaryHeap;
 
 use crate::carbon::{carbon_cost, travel_time_minutes, Vehicle};
-use crate::graph::{AllRoutes, Edge, OptimizeFor, RoadGraph, RouteResult};
+use crate::graph::{AllRoutes, OptimizeFor, RoadGraph, RouteResult};
 use crate::heuristic::{carbon_heuristic, time_heuristic};
 use crate::priority_queue::State;
 

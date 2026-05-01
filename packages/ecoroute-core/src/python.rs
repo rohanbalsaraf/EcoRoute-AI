@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::PyRuntimeError;
-use crate::graph::{RoadGraph, Node, Edge, AllRoutes};
+use crate::graph::{RoadGraph, Node, Edge};
 use crate::carbon::Vehicle;
 use crate::algorithm::find_all_routes;
 

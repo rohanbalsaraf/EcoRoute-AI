@@ -57,3 +57,4 @@ websockets==16.0
 requests==2.32.3
 python-jose[cryptography]==3.4.0
 svix==1.62.0
+sentry-sdk[fastapi]

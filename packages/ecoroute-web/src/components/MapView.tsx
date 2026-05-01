@@ -193,9 +193,9 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     if (!map.current || !mapReady.current) return;
     
     const currentTheme = resolvedTheme || 'dark';
-    map.current.setStyle(getStyle(currentTheme));
     
-    map.current.once('styledata', () => {
+    // Listen for style load before re-adding everything
+    const handleStyleLoad = () => {
       if (currentTheme === 'dark') {
         injectDarkColors();
       }
@@ -203,7 +203,14 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       if (routeGeometries) {
         updateRouteData(routeGeometries);
       }
-    });
+    };
+
+    map.current.setStyle(getStyle(currentTheme));
+    map.current.once('styledata', handleStyleLoad);
+    
+    return () => {
+      map.current?.off('styledata', handleStyleLoad);
+    };
   }, [resolvedTheme]);
 
   const updateRouteData = (geoms: { eco: [number, number][]; standard: [number, number][] }) => {

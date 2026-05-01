@@ -43,6 +43,7 @@ pub enum OptimizeFor {
 pub struct RoadGraph {
     pub nodes:     Vec<Node>,
     pub adjacency: Vec<Vec<Edge>>,
+    #[allow(dead_code)]
     pub tree:      KdTree<f64, usize, [f64; 2]>,
 }
 
@@ -76,6 +77,7 @@ impl RoadGraph {
     }
 
     // Find nearest node to a GPS coordinate — O(log n) via KD-Tree
+    #[allow(dead_code)]
     pub fn nearest_node(&self, lat: f64, lon: f64) -> usize {
         self.tree
             .nearest(&[lat, lon], 1, &squared_euclidean)

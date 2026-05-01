@@ -13,12 +13,12 @@ import CarbonMeter from "../../components/CarbonMeter";
 // ecoSaving = % carbon saved through eco-driving (varies by drivetrain)
 // trafficPenalty = extra % carbon from stop-and-go in standard driving
 const VEHICLES = [
-  { id: "petrol",   label: "Petrol Car",   icon: "⛽", factor: 0.21, ecoSaving: 0.15, trafficPenalty: 1.12, color: "#F59E0B" },
-  { id: "diesel",   label: "Diesel Car",   icon: "🛢️", factor: 0.27, ecoSaving: 0.12, trafficPenalty: 1.08, color: "#EF4444" },
-  { id: "cng",      label: "CNG Car",      icon: "💨", factor: 0.16, ecoSaving: 0.18, trafficPenalty: 1.15, color: "#3B82F6" },
-  { id: "hybrid",   label: "Hybrid",       icon: "🔋", factor: 0.10, ecoSaving: 0.28, trafficPenalty: 1.05, color: "#8B5CF6" },
-  { id: "ev",       label: "Electric (EV)",icon: "⚡", factor: 0.05, ecoSaving: 0.32, trafficPenalty: 1.03, color: "#00FFA3" },
-  { id: "bike",     label: "Motorcycle",   icon: "🏍️", factor: 0.11, ecoSaving: 0.10, trafficPenalty: 1.18, color: "#F97316" },
+  { id: "petrol",   label: "Petrol Car",   icon: "⛽", factor: 0.21, ecoSaving: 0.15, trafficPenalty: 1.12, color: "#F59E0B", timeFactor: 1.0 },
+  { id: "diesel",   label: "Diesel Car",   icon: "🛢️", factor: 0.27, ecoSaving: 0.12, trafficPenalty: 1.08, color: "#EF4444", timeFactor: 1.0 },
+  { id: "cng",      label: "CNG Car",      icon: "💨", factor: 0.16, ecoSaving: 0.18, trafficPenalty: 1.15, color: "#3B82F6", timeFactor: 1.0 },
+  { id: "hybrid",   label: "Hybrid",       icon: "🔋", factor: 0.10, ecoSaving: 0.28, trafficPenalty: 1.05, color: "#8B5CF6", timeFactor: 0.98 },
+  { id: "ev",       label: "Electric (EV)",icon: "⚡", factor: 0.05, ecoSaving: 0.32, trafficPenalty: 1.03, color: "#00FFA3", timeFactor: 1.05 },
+  { id: "bike",     label: "Motorcycle",   icon: "🏍️", factor: 0.11, ecoSaving: 0.10, trafficPenalty: 1.18, color: "#F97316", timeFactor: 0.82 },
 ];
 
 const ECO_DRIVING_TIME_PENALTY = 0.08;
@@ -173,8 +173,9 @@ export default function ComparePage() {
     
     // Vehicle-specific calculations
     const ecoCarbonKg = ecoDistKm * carbonFactor * (1 - vehicleData.ecoSaving);
-    const ecoTimeMins = rawRoutes.eco.duration_min * (1 + ECO_DRIVING_TIME_PENALTY);
+    const ecoTimeMins = (rawRoutes.eco.duration_min * (1 + ECO_DRIVING_TIME_PENALTY)) * (vehicleData.timeFactor || 1);
     const stdCarbonKg = stdDistKm * carbonFactor * vehicleData.trafficPenalty;
+    const stdTimeMins = rawRoutes.standard.duration_min * (vehicleData.timeFactor || 1);
     
     return {
       eco: {
@@ -186,7 +187,7 @@ export default function ComparePage() {
       },
       standard: {
         distance: `${stdDistKm.toFixed(1)} km`,
-        duration: `${rawRoutes.standard.duration_min.toFixed(0)} min`,
+        duration: `${stdTimeMins.toFixed(0)} min`,
         carbon: `${stdCarbonKg.toFixed(2)} kg`,
         carbonVal: stdCarbonKg,
         isEco: false,

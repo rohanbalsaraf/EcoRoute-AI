@@ -44,8 +44,6 @@ const getRoute = async () => {
       'Authorization': 'Bearer YOUR_API_KEY'
     }
   });
-  
-  console.log(response.data);
 };`
 };
 

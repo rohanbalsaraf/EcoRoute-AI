@@ -30,6 +30,17 @@ export default function DashboardStats() {
         if (res.ok) {
           const data = await res.json();
           setStats(data);
+          
+          // 80% Usage Warning
+          const usage = (data.api_calls_this_month / data.limit) * 100;
+          if (usage >= 80) {
+            import('sonner').then(({ toast }) => {
+              toast.warning("Usage Warning", {
+                description: `You have used ${usage.toFixed(1)}% of your monthly API quota. Upgrade to Pro to avoid limits.`,
+                duration: 10000,
+              });
+            });
+          }
         }
       } catch (error) {
         console.error("Failed to fetch stats:", error);

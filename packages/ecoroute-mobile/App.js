@@ -52,20 +52,23 @@ export default function App() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Select Vehicle</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehicleScroll}>
-            {VEHICLES.map((v) => (
-              <TouchableOpacity
-                key={v.id}
-                onPress={() => setSelectedVehicle(v.id)}
-                style={[
-                  styles.vehicleCard,
-                  selectedVehicle === v.id && { borderColor: v.color, backgroundColor: 'rgba(255,255,255,0.05)' }
-                ]}
-              >
-                <v.icon size={24} color={selectedVehicle === v.id ? v.color : '#64748b'} />
-                <Text style={[styles.vehicleLabel, selectedVehicle === v.id && { color: v.color }]}>{v.label}</Text>
-                <Text style={styles.vehicleSaving}>{v.saving} Save</Text>
-              </TouchableOpacity>
-            ))}
+            {VEHICLES.map((v) => {
+              const IconComponent = v.icon;
+              return (
+                <TouchableOpacity
+                  key={v.id}
+                  onPress={() => setSelectedVehicle(v.id)}
+                  style={[
+                    styles.vehicleCard,
+                    selectedVehicle === v.id && { borderColor: v.color, backgroundColor: 'rgba(255,255,255,0.05)' }
+                  ]}
+                >
+                  <IconComponent size={24} color={selectedVehicle === v.id ? v.color : '#64748b'} />
+                  <Text style={[styles.vehicleLabel, selectedVehicle === v.id && { color: v.color }]}>{v.label}</Text>
+                  <Text style={styles.vehicleSaving}>{v.saving} Save</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 

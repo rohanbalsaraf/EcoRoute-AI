@@ -33,9 +33,9 @@ class GeocodingClient:
             response = await client.get(
                 f"{self.BASE_URL}/search",
                 params={
-                    "q":              place_name,
-                    "format":         "json",
-                    "limit":          1,
+                    "q": place_name,
+                    "format": "json",
+                    "limit": 1,
                     "addressdetails": 1,
                 },
                 headers=self.headers,
@@ -49,10 +49,10 @@ class GeocodingClient:
 
             r = results[0]
             return Waypoint(
-                name       = r.get("display_name", place_name).split(",")[0],
-                coordinate = Coordinate(
-                    lat = float(r["lat"]),
-                    lon = float(r["lon"]),
+                name=r.get("display_name", place_name).split(",")[0],
+                coordinate=Coordinate(
+                    lat=float(r["lat"]),
+                    lon=float(r["lon"]),
                 ),
             )
 
@@ -87,16 +87,18 @@ class AQIClient:
         self.api_key = api_key or os.getenv("OPENAQ_API_KEY", "")
         self.headers = {"X-API-Key": self.api_key} if self.api_key else {}
 
-    async def get_aqi(self, lat: float, lon: float, radius_km: float = 10.0) -> Optional[AQIData]:
+    async def get_aqi(
+        self, lat: float, lon: float, radius_km: float = 10.0
+    ) -> Optional[AQIData]:
         """Get current AQI for a GPS location."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.BASE_URL}/locations",
                 params={
                     "coordinates": f"{lat},{lon}",
-                    "radius":      int(radius_km * 1000),  # metres
-                    "limit":       5,
-                    "order_by":    "distance",
+                    "radius": int(radius_km * 1000),  # metres
+                    "limit": 5,
+                    "order_by": "distance",
                 },
                 headers=self.headers,
                 timeout=10.0,
@@ -121,26 +123,26 @@ class AQIClient:
                             pm25_values.append(float(latest["value"]))
 
             pm25 = sum(pm25_values) / len(pm25_values) if pm25_values else 35.0
-            aqi  = self._pm25_to_aqi(pm25)
+            aqi = self._pm25_to_aqi(pm25)
 
             return AQIData(
-                location  = Coordinate(lat=lat, lon=lon),
-                pm25      = round(pm25, 2),
-                pm10      = round(pm25 * 1.5, 2),  # estimate
-                aqi_index = round(aqi, 1),
-                category  = AQIData.category_from_aqi(aqi),
+                location=Coordinate(lat=lat, lon=lon),
+                pm25=round(pm25, 2),
+                pm10=round(pm25 * 1.5, 2),  # estimate
+                aqi_index=round(aqi, 1),
+                category=AQIData.category_from_aqi(aqi),
             )
 
     @staticmethod
     def _pm25_to_aqi(pm25: float) -> float:
         """Convert PM2.5 µg/m³ to AQI index (US EPA formula)."""
         breakpoints = [
-            (0,    12.0,  0,   50),
-            (12.1, 35.4,  51,  100),
-            (35.5, 55.4,  101, 150),
+            (0, 12.0, 0, 50),
+            (12.1, 35.4, 51, 100),
+            (35.5, 55.4, 101, 150),
             (55.5, 150.4, 151, 200),
-            (150.5,250.4, 201, 300),
-            (250.5,500.4, 301, 500),
+            (150.5, 250.4, 201, 300),
+            (250.5, 500.4, 301, 500),
         ]
         for c_lo, c_hi, i_lo, i_hi in breakpoints:
             if c_lo <= pm25 <= c_hi:
@@ -150,11 +152,11 @@ class AQIClient:
     @staticmethod
     def _default_aqi(lat: float, lon: float) -> AQIData:
         return AQIData(
-            location  = Coordinate(lat=lat, lon=lon),
-            pm25      = 35.0,
-            pm10      = 52.5,
-            aqi_index = 100.0,
-            category  = "Moderate",
+            location=Coordinate(lat=lat, lon=lon),
+            pm25=35.0,
+            pm10=52.5,
+            aqi_index=100.0,
+            category="Moderate",
         )
 
 
@@ -171,39 +173,46 @@ class WeatherClient:
             response = await client.get(
                 self.BASE_URL,
                 params={
-                    "latitude":        lat,
-                    "longitude":       lon,
-                    "current":         "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code",
+                    "latitude": lat,
+                    "longitude": lon,
+                    "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code",
                     "wind_speed_unit": "kmh",
-                    "timezone":        "auto",
-                    "forecast_days":   1,
+                    "timezone": "auto",
+                    "forecast_days": 1,
                 },
                 timeout=10.0,
             )
             response.raise_for_status()
-            data    = response.json()
+            data = response.json()
             current = data.get("current", {})
 
             weather_code = current.get("weather_code", 0)
-            condition    = self._weather_code_to_condition(weather_code)
+            condition = self._weather_code_to_condition(weather_code)
 
             return WeatherData(
-                location       = Coordinate(lat=lat, lon=lon),
-                temperature_c  = current.get("temperature_2m", 25.0),
-                humidity_pct   = current.get("relative_humidity_2m", 60.0),
-                wind_speed_kmh = current.get("wind_speed_10m", 10.0),
-                condition      = condition,
+                location=Coordinate(lat=lat, lon=lon),
+                temperature_c=current.get("temperature_2m", 25.0),
+                humidity_pct=current.get("relative_humidity_2m", 60.0),
+                wind_speed_kmh=current.get("wind_speed_10m", 10.0),
+                condition=condition,
             )
 
     @staticmethod
     def _weather_code_to_condition(code: int) -> str:
-        if code == 0:              return "clear"
-        if code in range(1, 4):    return "partly_cloudy"
-        if code in range(45, 50):  return "fog"
-        if code in range(51, 68):  return "rain"
-        if code in range(71, 78):  return "snow"
-        if code in range(80, 83):  return "rain"
-        if code in range(95, 100): return "thunderstorm"
+        if code == 0:
+            return "clear"
+        if code in range(1, 4):
+            return "partly_cloudy"
+        if code in range(45, 50):
+            return "fog"
+        if code in range(51, 68):
+            return "rain"
+        if code in range(71, 78):
+            return "snow"
+        if code in range(80, 83):
+            return "rain"
+        if code in range(95, 100):
+            return "thunderstorm"
         return "clear"
 
 
@@ -216,7 +225,7 @@ class OSRMClient:
 
     async def get_route(
         self,
-        origin:      Coordinate,
+        origin: Coordinate,
         destination: Coordinate,
     ) -> Optional[dict]:
         """
@@ -229,16 +238,16 @@ class OSRMClient:
             response = await client.get(
                 f"{self.BASE_URL}/route/v1/driving/{coords}",
                 params={
-                    "overview":    "full",
+                    "overview": "full",
                     "geometries": "geojson",
-                    "steps":       "true",
+                    "steps": "true",
                 },
                 timeout=15.0,
             )
             if response.status_code != 200:
                 return None
 
-            data   = response.json()
+            data = response.json()
             routes = data.get("routes", [])
             if not routes:
                 return None
@@ -246,9 +255,9 @@ class OSRMClient:
             route = routes[0]
             return {
                 "distance_km": round(route["distance"] / 1000, 2),
-                "time_min":    round(route["duration"] / 60, 1),
-                "geometry":    route.get("geometry", {}),
-                "steps":       route.get("legs", [{}])[0].get("steps", []),
+                "time_min": round(route["duration"] / 60, 1),
+                "geometry": route.get("geometry", {}),
+                "steps": route.get("legs", [{}])[0].get("steps", []),
             }
 
     async def get_nearest_road(self, lat: float, lon: float) -> Optional[Coordinate]:
@@ -261,7 +270,7 @@ class OSRMClient:
             )
             if response.status_code != 200:
                 return None
-            data      = response.json()
+            data = response.json()
             waypoints = data.get("waypoints", [])
             if not waypoints:
                 return None

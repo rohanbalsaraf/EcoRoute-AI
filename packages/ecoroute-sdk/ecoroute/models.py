@@ -16,18 +16,18 @@ from pydantic import BaseModel, Field, computed_field
 class VehicleType(str, Enum):
     PETROL = "petrol"
     DIESEL = "diesel"
-    CNG    = "cng"
+    CNG = "cng"
     HYBRID = "hybrid"
-    EV     = "ev"
+    EV = "ev"
 
     def emission_factor(self) -> float:
         """kg CO2 per litre of fuel"""
         return {
             VehicleType.PETROL: 2.31,
             VehicleType.DIESEL: 2.68,
-            VehicleType.CNG:    1.63,
+            VehicleType.CNG: 1.63,
             VehicleType.HYBRID: 2.31,
-            VehicleType.EV:     0.0,
+            VehicleType.EV: 0.0,
         }[self]
 
     def consumption_per_km(self) -> float:
@@ -35,9 +35,9 @@ class VehicleType(str, Enum):
         return {
             VehicleType.PETROL: 0.06,
             VehicleType.DIESEL: 0.055,
-            VehicleType.CNG:    0.05,
+            VehicleType.CNG: 0.05,
             VehicleType.HYBRID: 0.035,
-            VehicleType.EV:     0.0,
+            VehicleType.EV: 0.0,
         }[self]
 
     def label(self) -> str:
@@ -48,8 +48,8 @@ class VehicleType(str, Enum):
 # OptimizeFor — which metric to minimise
 # ----------------------------------------------------------------
 class OptimizeFor(str, Enum):
-    CARBON   = "carbon"
-    TIME     = "time"
+    CARBON = "carbon"
+    TIME = "time"
     DISTANCE = "distance"
 
 
@@ -57,7 +57,7 @@ class OptimizeFor(str, Enum):
 # Coordinate — a GPS point
 # ----------------------------------------------------------------
 class Coordinate(BaseModel):
-    lat: float = Field(..., ge=-90,  le=90,  description="Latitude")
+    lat: float = Field(..., ge=-90, le=90, description="Latitude")
     lon: float = Field(..., ge=-180, le=180, description="Longitude")
 
     def __str__(self) -> str:
@@ -68,32 +68,32 @@ class Coordinate(BaseModel):
 # Waypoint — one stop along a route with human-readable name
 # ----------------------------------------------------------------
 class Waypoint(BaseModel):
-    name:       str
+    name: str
     coordinate: Coordinate
-    node_id:    Optional[int] = None
+    node_id: Optional[int] = None
 
 
 # ----------------------------------------------------------------
 # SavingsEquivalents — human-understandable CO2 comparisons
 # ----------------------------------------------------------------
 class SavingsEquivalents(BaseModel):
-    saved_kg:              float
-    smartphones_charged:   float
+    saved_kg: float
+    smartphones_charged: float
     trees_days_equivalent: float
-    km_not_driven:         float
-    annual_saving_kg:      float  # assuming 500 trips/year
-    annual_trees:          float
+    km_not_driven: float
+    annual_saving_kg: float  # assuming 500 trips/year
+    annual_trees: float
 
     @classmethod
     def from_saved_kg(cls, saved_kg: float) -> "SavingsEquivalents":
         annual = saved_kg * 500
         return cls(
-            saved_kg              = round(saved_kg, 4),
-            smartphones_charged   = round(saved_kg / 0.00822, 1),
-            trees_days_equivalent = round(saved_kg / (21.7 / 365), 1),
-            km_not_driven         = round(saved_kg / 0.21, 1),
-            annual_saving_kg      = round(annual, 1),
-            annual_trees          = round(annual / 21.7, 1),
+            saved_kg=round(saved_kg, 4),
+            smartphones_charged=round(saved_kg / 0.00822, 1),
+            trees_days_equivalent=round(saved_kg / (21.7 / 365), 1),
+            km_not_driven=round(saved_kg / 0.21, 1),
+            annual_saving_kg=round(annual, 1),
+            annual_trees=round(annual / 21.7, 1),
         )
 
     def message(self) -> str:
@@ -111,28 +111,28 @@ class SavingsEquivalents(BaseModel):
 # RouteSegment — one leg of a route (between two nodes)
 # ----------------------------------------------------------------
 class RouteSegment(BaseModel):
-    from_name:         str
-    to_name:           str
-    distance_km:       float
-    time_min:          float
-    carbon_kg:         float
-    road_type:         str = "road"
-    congestion_level:  str = "unknown"  # low | medium | high
+    from_name: str
+    to_name: str
+    distance_km: float
+    time_min: float
+    carbon_kg: float
+    road_type: str = "road"
+    congestion_level: str = "unknown"  # low | medium | high
 
 
 # ----------------------------------------------------------------
 # Route — one complete route option
 # ----------------------------------------------------------------
 class Route(BaseModel):
-    label:             str                  # "Greenest" | "Fastest" | "Shortest"
-    optimize_for:      OptimizeFor
-    path_node_ids:     list[int]
-    waypoints:         list[Waypoint]       = Field(default_factory=list)
-    segments:          list[RouteSegment]   = Field(default_factory=list)
+    label: str  # "Greenest" | "Fastest" | "Shortest"
+    optimize_for: OptimizeFor
+    path_node_ids: list[int]
+    waypoints: list[Waypoint] = Field(default_factory=list)
+    segments: list[RouteSegment] = Field(default_factory=list)
     total_distance_km: float
-    total_time_min:    float
-    total_carbon_kg:   float
-    vehicle:           VehicleType
+    total_time_min: float
+    total_carbon_kg: float
+    vehicle: VehicleType
 
     @computed_field  # type: ignore
     @property
@@ -157,12 +157,12 @@ class Route(BaseModel):
 # This is what find_routes() returns
 # ----------------------------------------------------------------
 class RouteResponse(BaseModel):
-    origin:      Waypoint
+    origin: Waypoint
     destination: Waypoint
-    vehicle:     VehicleType
-    greenest:    Route
-    fastest:     Route
-    shortest:    Route
+    vehicle: VehicleType
+    greenest: Route
+    fastest: Route
+    shortest: Route
 
     @computed_field  # type: ignore
     @property
@@ -203,19 +203,24 @@ class RouteResponse(BaseModel):
 # AQIData — air quality for a location
 # ----------------------------------------------------------------
 class AQIData(BaseModel):
-    location:  Coordinate
-    pm25:      float   # PM2.5 µg/m³
-    pm10:      float   # PM10 µg/m³
-    aqi_index: float   # 0–500
-    category:  str     # Good | Moderate | Unhealthy | Hazardous
+    location: Coordinate
+    pm25: float  # PM2.5 µg/m³
+    pm10: float  # PM10 µg/m³
+    aqi_index: float  # 0–500
+    category: str  # Good | Moderate | Unhealthy | Hazardous
 
     @classmethod
     def category_from_aqi(cls, aqi: float) -> str:
-        if aqi <= 50:   return "Good"
-        if aqi <= 100:  return "Moderate"
-        if aqi <= 150:  return "Unhealthy for Sensitive Groups"
-        if aqi <= 200:  return "Unhealthy"
-        if aqi <= 300:  return "Very Unhealthy"
+        if aqi <= 50:
+            return "Good"
+        if aqi <= 100:
+            return "Moderate"
+        if aqi <= 150:
+            return "Unhealthy for Sensitive Groups"
+        if aqi <= 200:
+            return "Unhealthy"
+        if aqi <= 300:
+            return "Very Unhealthy"
         return "Hazardous"
 
 
@@ -223,17 +228,21 @@ class AQIData(BaseModel):
 # WeatherData — current weather affecting route cost
 # ----------------------------------------------------------------
 class WeatherData(BaseModel):
-    location:        Coordinate
-    temperature_c:   float
-    humidity_pct:    float
-    wind_speed_kmh:  float
-    condition:       str   # clear | rain | fog | snow
+    location: Coordinate
+    temperature_c: float
+    humidity_pct: float
+    wind_speed_kmh: float
+    condition: str  # clear | rain | fog | snow
 
     def fuel_penalty(self) -> float:
         """Extra fuel factor due to weather conditions"""
         penalty = 1.0
-        if self.condition == "rain":  penalty += 0.05
-        if self.condition == "fog":   penalty += 0.03
-        if self.condition == "snow":  penalty += 0.15
-        if self.wind_speed_kmh > 40:  penalty += 0.03
+        if self.condition == "rain":
+            penalty += 0.05
+        if self.condition == "fog":
+            penalty += 0.03
+        if self.condition == "snow":
+            penalty += 0.15
+        if self.wind_speed_kmh > 40:
+            penalty += 0.03
         return penalty

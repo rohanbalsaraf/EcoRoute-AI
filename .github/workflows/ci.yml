@@ -166,6 +166,10 @@ jobs:
       - name: Run E2E Smoke Test
         run: pnpm --filter ecoroute-web run test:e2e
         continue-on-error: true # Allow failure until full E2E suite is stable
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: test_key
+          CLERK_SECRET_KEY: test_secret
+          NEXT_PUBLIC_API_URL: http://localhost:8000
 
   ecoroute-agent:
     name: AI Agent (Validation)

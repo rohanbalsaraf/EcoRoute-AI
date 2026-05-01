@@ -1,11 +1,9 @@
-import hmac
 import hashlib
 import os
 import time
 import redis
-import json
 import sentry_sdk
-from fastapi import FastAPI, Depends, Request, HTTPException, Header
+from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -18,11 +16,11 @@ if SENTRY_DSN:
         profiles_sample_rate=1.0,
     )
 
-from .auth import get_current_user, verify_api_key, UserSchema
-from .database import get_db
-from .models import User, Subscription
-from . import graph_store
-from .webhooks import router as webhooks_router
+from .auth import get_current_user, verify_api_key, UserSchema  # noqa: E402
+from .database import get_db  # noqa: E402
+from .models import User, Subscription  # noqa: E402
+from . import graph_store  # noqa: E402
+from .webhooks import router as webhooks_router  # noqa: E402
 
 app = FastAPI(
     title="EcoRoute API",
@@ -135,7 +133,7 @@ def health_check(db: Session = Depends(get_db)):
         
     return status
 
-from pydantic import BaseModel
+from pydantic import BaseModel  # noqa: E402
 
 class RouteRequest(BaseModel):
     origin_lat: float
@@ -160,7 +158,7 @@ def calculate_route(request: RouteRequest, api_key_data: dict = Depends(verify_a
         dist_sq_dest = (lat_end - request.dest_lat)**2 + (lon_end - request.dest_lon)**2
         
         if dist_sq_origin > 0.02 or dist_sq_dest > 0.02:
-            print(f"🌍 Long route or new area detected! Ingesting OSM data...")
+            print("🌍 Long route or new area detected! Ingesting OSM data...")
             graph_store.update_graph_for_area(
                 request.origin_lat, request.origin_lon,
                 request.dest_lat, request.dest_lon
@@ -323,7 +321,7 @@ def create_api_key(name: str = "Default Key", user: UserSchema = Depends(get_cur
 def list_api_keys(user: UserSchema = Depends(get_current_user), db: Session = Depends(get_db)):
     """Lists the user's API keys (display versions only)."""
     from .models import APIKey
-    keys = db.query(APIKey).filter(APIKey.user_id == user.id, APIKey.is_active == True).all()
+    keys = db.query(APIKey).filter(APIKey.user_id == user.id, APIKey.is_active).all()
     return [{"id": k.id, "name": k.name, "display_key": k.display_key, "is_active": k.is_active, "created_at": k.created_at} for k in keys]
 
 @app.delete("/internal/dashboard/api-keys/{key_id}", dependencies=[Depends(get_current_user)])

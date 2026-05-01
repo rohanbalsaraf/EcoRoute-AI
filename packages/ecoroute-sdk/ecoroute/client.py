@@ -13,7 +13,15 @@ from __future__ import annotations
 import asyncio
 import math
 from typing import Optional
-from .models import Coordinate, RouteResponse, VehicleType, Waypoint
+import os
+import httpx
+from .models import (
+    Coordinate,
+    RouteResponse,
+    VehicleType,
+    Waypoint,
+    WeatherData,
+)
 from .data_sources import AQIClient, GeocodingClient, OSRMClient, WeatherClient
 from .optimizer import Optimizer, PyEdge, PyNode
 
@@ -47,15 +55,15 @@ class EcoRouteClient:
 
     def __init__(
         self,
-        api_url:           Optional[str] = None,
-        openaq_api_key:    Optional[str] = None,
+        api_url: Optional[str] = None,
+        openaq_api_key: Optional[str] = None,
         openweather_api_key: Optional[str] = None,
     ) -> None:
-        self.api_url    = api_url or os.getenv("ECOROUTE_API_URL")
-        self._geocoder  = GeocodingClient()
-        self._aqi       = AQIClient(api_key=openaq_api_key)
-        self._weather   = WeatherClient()
-        self._osrm      = OSRMClient()
+        self.api_url = api_url or os.getenv("ECOROUTE_API_URL")
+        self._geocoder = GeocodingClient()
+        self._aqi = AQIClient(api_key=openaq_api_key)
+        self._weather = WeatherClient()
+        self._osrm = OSRMClient()
         self._optimizer = Optimizer()
 
     # ----------------------------------------------------------------
@@ -63,9 +71,9 @@ class EcoRouteClient:
     # ----------------------------------------------------------------
     async def find_routes(
         self,
-        origin:      str | Coordinate,
+        origin: str | Coordinate,
         destination: str | Coordinate,
-        vehicle:     str | VehicleType = "petrol",
+        vehicle: str | VehicleType = "petrol",
     ) -> Optional[RouteResponse]:
         """
         Find greenest, fastest, and shortest routes between two points.
@@ -76,7 +84,7 @@ class EcoRouteClient:
 
         # Resolve coordinates
         origin_wp = await self._resolve_location(origin)
-        dest_wp   = await self._resolve_location(destination)
+        dest_wp = await self._resolve_location(destination)
 
         if origin_wp is None or dest_wp is None:
             return None
@@ -96,13 +104,13 @@ class EcoRouteClient:
             return None
 
         return self._optimizer.find_routes(
-            nodes      = nodes,
-            adjacency  = adjacency,
-            start      = 0,
-            end        = len(nodes) - 1,
-            vehicle    = vehicle,
-            origin_wp  = origin_wp,
-            dest_wp    = dest_wp,
+            nodes=nodes,
+            adjacency=adjacency,
+            start=0,
+            end=len(nodes) - 1,
+            vehicle=vehicle,
+            origin_wp=origin_wp,
+            dest_wp=dest_wp,
         )
 
     async def _fetch_remote_routes(
@@ -114,15 +122,15 @@ class EcoRouteClient:
                 response = await client.get(
                     f"{self.api_url}/routes",
                     params={
-                        "origin":      f"{origin.coordinate.lat},{origin.coordinate.lon}",
+                        "origin": f"{origin.coordinate.lat},{origin.coordinate.lon}",
                         "destination": f"{dest.coordinate.lat},{dest.coordinate.lon}",
-                        "vehicle":     vehicle.value,
+                        "vehicle": vehicle.value,
                     },
-                    timeout=30.0
+                    timeout=30.0,
                 )
                 if response.status_code != 200:
                     return None
-                
+
                 # The API returns a similar structure to RouteResponse
                 # In a real implementation we would parse the JSON into Pydantic models
                 data = response.json()
@@ -135,9 +143,9 @@ class EcoRouteClient:
     # ----------------------------------------------------------------
     def find_routes_sync(
         self,
-        origin:      str | Coordinate,
+        origin: str | Coordinate,
         destination: str | Coordinate,
-        vehicle:     str | VehicleType = "petrol",
+        vehicle: str | VehicleType = "petrol",
     ) -> Optional[RouteResponse]:
         """Synchronous wrapper around find_routes."""
         return asyncio.run(self.find_routes(origin, destination, vehicle))
@@ -148,7 +156,7 @@ class EcoRouteClient:
     async def carbon_for_path(
         self,
         waypoints: list[str | Coordinate],
-        vehicle:   str | VehicleType = "petrol",
+        vehicle: str | VehicleType = "petrol",
     ) -> float:
         """
         Calculate total carbon for a multi-stop journey.
@@ -159,9 +167,7 @@ class EcoRouteClient:
 
         total_carbon = 0.0
         for i in range(len(waypoints) - 1):
-            result = await self.find_routes(
-                waypoints[i], waypoints[i + 1], vehicle
-            )
+            result = await self.find_routes(waypoints[i], waypoints[i + 1], vehicle)
             if result:
                 total_carbon += result.greenest.total_carbon_kg
 
@@ -170,9 +176,7 @@ class EcoRouteClient:
     # ----------------------------------------------------------------
     # Internal helpers
     # ----------------------------------------------------------------
-    async def _resolve_location(
-        self, location: str | Coordinate
-    ) -> Optional[Waypoint]:
+    async def _resolve_location(self, location: str | Coordinate) -> Optional[Waypoint]:
         if isinstance(location, Coordinate):
             name = await self._geocoder.reverse_geocode(location.lat, location.lon)
             return Waypoint(name=name or "Unknown", coordinate=location)
@@ -180,9 +184,9 @@ class EcoRouteClient:
 
     async def _build_real_graph(
         self,
-        origin:      Coordinate,
+        origin: Coordinate,
         destination: Coordinate,
-        vehicle:     VehicleType,
+        vehicle: VehicleType,
     ) -> tuple[list[PyNode], list[list[PyEdge]]]:
         """
         Build a real routing graph by fetching a base route from OSRM
@@ -200,20 +204,18 @@ class EcoRouteClient:
         # Concurrent data fetching for midpoint
         mid_lat = (origin.lat + destination.lat) / 2
         mid_lon = (origin.lon + destination.lon) / 2
-        
+
         weather, aqi = await asyncio.gather(
             self._weather.get_weather(mid_lat, mid_lon),
             self._aqi.get_aqi(mid_lat, mid_lon),
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         weather_penalty = 1.0
         if isinstance(weather, WeatherData):
             weather_penalty = weather.fuel_penalty()
 
-        aqi_factor = 1.0
-        if isinstance(aqi, AQIData):
-            aqi_factor = 1.0 + (aqi.aqi_index / 500.0) * 0.2
+        # aqi_factor was calculated here previously but removed due to F841 since it was unused
 
         # Convert OSRM steps to graph nodes and edges
         nodes: list[PyNode] = []
@@ -226,7 +228,7 @@ class EcoRouteClient:
         for i, step in enumerate(steps):
             loc = step.get("maneuver", {}).get("location", [0, 0])
             name = step.get("name", f"Step {i}")
-            
+
             node_id = i + 1
             nodes.append(PyNode(node_id, loc[1], loc[0], name))
             adjacency.append([])
@@ -234,20 +236,20 @@ class EcoRouteClient:
             # Create edge from previous node to this one
             dist = step.get("distance", 0) / 1000.0
             duration = step.get("duration", 1) / 60.0
-            
+
             # Estimate speed
             speed = (dist / (duration / 60.0)) if duration > 0 else 30.0
-            
+
             # Simple heuristic for signals (OSRM often marks them in 'intersections')
-            num_signals = len(step.get("intersections", [])) // 2 
+            num_signals = len(step.get("intersections", [])) // 2
 
             edge = PyEdge(
-                to                = node_id,
-                distance_km       = dist,
-                speed_limit_kmh   = speed * 1.2, # assume limit is slightly higher
-                current_speed_kmh = speed * weather_penalty,
-                gradient_pct      = 0.0, # would need DEM for real gradient
-                num_signals       = num_signals,
+                to=node_id,
+                distance_km=dist,
+                speed_limit_kmh=speed * 1.2,  # assume limit is slightly higher
+                current_speed_kmh=speed * weather_penalty,
+                gradient_pct=0.0,  # would need DEM for real gradient
+                num_signals=num_signals,
             )
             adjacency[i].append(edge)
 
@@ -255,10 +257,13 @@ class EcoRouteClient:
 
 
 def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    r    = 6371.0
+    r = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     lat1 = math.radians(lat1)
     lat2 = math.radians(lat2)
-    a    = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
     return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))

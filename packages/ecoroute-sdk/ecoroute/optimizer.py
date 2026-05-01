@@ -14,8 +14,12 @@ from __future__ import annotations
 import math
 from typing import Optional
 from .models import (
-    Route, RouteResponse, OptimizeFor,
-    VehicleType, Waypoint, Coordinate,
+    Route,
+    RouteResponse,
+    OptimizeFor,
+    VehicleType,
+    Waypoint,
+    Coordinate,
 )
 
 
@@ -24,8 +28,12 @@ from .models import (
 # ----------------------------------------------------------------
 class PyEdge:
     __slots__ = [
-        "to", "distance_km", "speed_limit_kmh",
-        "current_speed_kmh", "gradient_pct", "num_signals",
+        "to",
+        "distance_km",
+        "speed_limit_kmh",
+        "current_speed_kmh",
+        "gradient_pct",
+        "num_signals",
     ]
 
     def __init__(
@@ -37,21 +45,21 @@ class PyEdge:
         gradient_pct: float,
         num_signals: int,
     ) -> None:
-        self.to                = to
-        self.distance_km       = distance_km
-        self.speed_limit_kmh   = speed_limit_kmh
+        self.to = to
+        self.distance_km = distance_km
+        self.speed_limit_kmh = speed_limit_kmh
         self.current_speed_kmh = current_speed_kmh
-        self.gradient_pct      = gradient_pct
-        self.num_signals       = num_signals
+        self.gradient_pct = gradient_pct
+        self.num_signals = num_signals
 
 
 class PyNode:
     __slots__ = ["id", "lat", "lon", "name"]
 
     def __init__(self, id: int, lat: float, lon: float, name: str = "") -> None:
-        self.id   = id
-        self.lat  = lat
-        self.lon  = lon
+        self.id = id
+        self.lat = lat
+        self.lon = lon
         self.name = name
 
 
@@ -70,7 +78,8 @@ def _carbon_cost(edge: PyEdge, vehicle: VehicleType) -> float:
     # acceleration penalty
     speed_ratio = (
         edge.current_speed_kmh / edge.speed_limit_kmh
-        if edge.speed_limit_kmh > 0 else 1.0
+        if edge.speed_limit_kmh > 0
+        else 1.0
     )
     speed_ratio = max(0.0, min(1.0, speed_ratio))
 
@@ -93,7 +102,7 @@ def _carbon_cost(edge: PyEdge, vehicle: VehicleType) -> float:
 
     # idle fuel at signals
     idle_hours = (edge.num_signals * 45.0) / 3600.0
-    idle_fuel  = idle_hours * _idle_consumption(vehicle)
+    idle_fuel = idle_hours * _idle_consumption(vehicle)
 
     total_fuel = moving_fuel + idle_fuel
     return max(0.0, total_fuel * vehicle.emission_factor())
@@ -103,9 +112,9 @@ def _idle_consumption(vehicle: VehicleType) -> float:
     return {
         VehicleType.PETROL: 0.50,
         VehicleType.DIESEL: 0.55,
-        VehicleType.CNG:    0.45,
+        VehicleType.CNG: 0.45,
         VehicleType.HYBRID: 0.10,
-        VehicleType.EV:     0.00,
+        VehicleType.EV: 0.00,
     }[vehicle]
 
 
@@ -118,12 +127,15 @@ def _travel_time_minutes(edge: PyEdge) -> float:
 # Haversine — mirrors heuristic.rs
 # ----------------------------------------------------------------
 def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    r    = 6371.0
+    r = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     lat1 = math.radians(lat1)
     lat2 = math.radians(lat2)
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
     return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
@@ -132,22 +144,22 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 # Mirrors algorithm.rs green_dijkstra exactly
 # ----------------------------------------------------------------
 def _green_dijkstra(
-    nodes:      list[PyNode],
-    adjacency:  list[list[PyEdge]],
-    start:      int,
-    end:        int,
-    vehicle:    VehicleType,
-    weight:     str = "carbon",  # "carbon" | "time" | "distance"
+    nodes: list[PyNode],
+    adjacency: list[list[PyEdge]],
+    start: int,
+    end: int,
+    vehicle: VehicleType,
+    weight: str = "carbon",  # "carbon" | "time" | "distance"
 ) -> Optional[tuple[float, list[int]]]:
     import heapq
 
-    n       = len(adjacency)
-    cost    = [math.inf] * n
-    prev    = [-1] * n
+    n = len(adjacency)
+    cost = [math.inf] * n
+    prev = [-1] * n
     visited = [False] * n
 
     cost[start] = 0.0
-    heap        = [(0.0, start)]
+    heap = [(0.0, start)]
 
     while heap:
         c, u = heapq.heappop(heap)
@@ -178,7 +190,7 @@ def _green_dijkstra(
         return None
 
     # reconstruct path
-    path    = []
+    path = []
     current = end
     while current != -1:
         path.append(current)
@@ -190,8 +202,8 @@ def _green_dijkstra(
 
 def _total_carbon(
     adjacency: list[list[PyEdge]],
-    path:      list[int],
-    vehicle:   VehicleType,
+    path: list[int],
+    vehicle: VehicleType,
 ) -> float:
     total = 0.0
     for i in range(len(path) - 1):
@@ -239,20 +251,23 @@ class Optimizer:
         self._use_rust = False
         try:
             from ecoroute import _core  # noqa: F401
+
             self._use_rust = True
             print("[ecoroute] Using compiled Rust core ⚡")
         except ImportError:
-            print("[ecoroute] Using Python fallback (run `maturin develop` for Rust speed)")
+            print(
+                "[ecoroute] Using Python fallback (run `maturin develop` for Rust speed)"
+            )
 
     def find_routes(
         self,
-        nodes:      list[PyNode],
-        adjacency:  list[list[PyEdge]],
-        start:      int,
-        end:        int,
-        vehicle:    VehicleType,
-        origin_wp:  Waypoint,
-        dest_wp:    Waypoint,
+        nodes: list[PyNode],
+        adjacency: list[list[PyEdge]],
+        start: int,
+        end: int,
+        vehicle: VehicleType,
+        origin_wp: Waypoint,
+        dest_wp: Waypoint,
     ) -> Optional[RouteResponse]:
 
         if self._use_rust:
@@ -265,70 +280,73 @@ class Optimizer:
 
     def _find_routes_python(
         self,
-        nodes:      list[PyNode],
-        adjacency:  list[list[PyEdge]],
-        start:      int,
-        end:        int,
-        vehicle:    VehicleType,
-        origin_wp:  Waypoint,
-        dest_wp:    Waypoint,
+        nodes: list[PyNode],
+        adjacency: list[list[PyEdge]],
+        start: int,
+        end: int,
+        vehicle: VehicleType,
+        origin_wp: Waypoint,
+        dest_wp: Waypoint,
     ) -> Optional[RouteResponse]:
 
         # Run three variants
         green_raw = _green_dijkstra(nodes, adjacency, start, end, vehicle, "carbon")
-        time_raw  = _green_dijkstra(nodes, adjacency, start, end, vehicle, "time")
-        dist_raw  = _green_dijkstra(nodes, adjacency, start, end, vehicle, "distance")
+        time_raw = _green_dijkstra(nodes, adjacency, start, end, vehicle, "time")
+        dist_raw = _green_dijkstra(nodes, adjacency, start, end, vehicle, "distance")
 
         if not green_raw or not time_raw or not dist_raw:
             return None
 
         green_cost, green_path = green_raw
-        time_cost,  time_path  = time_raw
-        dist_cost,  dist_path  = dist_raw
+        time_cost, time_path = time_raw
+        dist_cost, dist_path = dist_raw
 
         def make_route(
-            label:        str,
+            label: str,
             optimize_for: OptimizeFor,
-            path:         list[int],
-            carbon_kg:    float,
-            distance_km:  float,
-            time_min:     float,
+            path: list[int],
+            carbon_kg: float,
+            distance_km: float,
+            time_min: float,
         ) -> Route:
             waypoints = [
                 Waypoint(
-                    name       = nodes[i].name or f"Node {i}",
-                    coordinate = Coordinate(lat=nodes[i].lat, lon=nodes[i].lon),
-                    node_id    = i,
+                    name=nodes[i].name or f"Node {i}",
+                    coordinate=Coordinate(lat=nodes[i].lat, lon=nodes[i].lon),
+                    node_id=i,
                 )
                 for i in path
             ]
             return Route(
-                label             = label,
-                optimize_for      = optimize_for,
-                path_node_ids     = path,
-                waypoints         = waypoints,
-                total_distance_km = round(distance_km, 2),
-                total_time_min    = round(time_min, 1),
-                total_carbon_kg   = round(carbon_kg, 4),
-                vehicle           = vehicle,
+                label=label,
+                optimize_for=optimize_for,
+                path_node_ids=path,
+                waypoints=waypoints,
+                total_distance_km=round(distance_km, 2),
+                total_time_min=round(time_min, 1),
+                total_carbon_kg=round(carbon_kg, 4),
+                vehicle=vehicle,
             )
 
         greenest = make_route(
-            "Greenest", OptimizeFor.CARBON,
+            "Greenest",
+            OptimizeFor.CARBON,
             green_path,
             green_cost,
             _total_distance(adjacency, green_path),
             _total_time(adjacency, green_path),
         )
         fastest = make_route(
-            "Fastest", OptimizeFor.TIME,
+            "Fastest",
+            OptimizeFor.TIME,
             time_path,
             _total_carbon(adjacency, time_path, vehicle),
             _total_distance(adjacency, time_path),
             time_cost,
         )
         shortest = make_route(
-            "Shortest", OptimizeFor.DISTANCE,
+            "Shortest",
+            OptimizeFor.DISTANCE,
             dist_path,
             _total_carbon(adjacency, dist_path, vehicle),
             dist_cost,
@@ -336,12 +354,12 @@ class Optimizer:
         )
 
         return RouteResponse(
-            origin      = origin_wp,
-            destination = dest_wp,
-            vehicle     = vehicle,
-            greenest    = greenest,
-            fastest     = fastest,
-            shortest    = shortest,
+            origin=origin_wp,
+            destination=dest_wp,
+            vehicle=vehicle,
+            greenest=greenest,
+            fastest=fastest,
+            shortest=shortest,
         )
 
     def _find_routes_rust(self, *args, **kwargs) -> Optional[RouteResponse]:

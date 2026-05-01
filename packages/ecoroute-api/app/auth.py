@@ -1,7 +1,7 @@
 import os
 import requests
 from jose import jwt
-from fastapi import Depends, HTTPException, Security, Request
+from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from .database import get_db
@@ -9,7 +9,7 @@ from .models import User, APIKey, Subscription
 from pydantic import BaseModel
 from typing import Optional
 
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
+from fastapi.security import APIKeyHeader
 
 security = HTTPBearer()
 api_key_header = APIKeyHeader(name="X-API-Key")
@@ -96,7 +96,7 @@ async def verify_api_key(
     import hashlib
     hashed_token = hashlib.sha256(token.encode()).hexdigest()
     
-    db_api_key = db.query(APIKey).filter(APIKey.hashed_key == hashed_token, APIKey.is_active == True).first()
+    db_api_key = db.query(APIKey).filter(APIKey.hashed_key == hashed_token, APIKey.is_active).first()
     
     if not db_api_key:
         raise HTTPException(status_code=403, detail="Invalid or revoked API Key")

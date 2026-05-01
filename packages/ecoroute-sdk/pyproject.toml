@@ -1,6 +1,6 @@
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
-build-backend = "maturin"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "ecoroute"
@@ -36,10 +36,8 @@ dev = [
     "mypy>=1.10.0",
 ]
 
-[tool.maturin]
-python-source = "."
-module-name = "ecoroute._core"
-features = ["pyo3/extension-module"]
+[tool.hatch.build.targets.wheel]
+packages = ["ecoroute"]
 
 [tool.ruff]
 line-length = 88

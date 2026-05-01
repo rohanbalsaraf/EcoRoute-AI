@@ -36,6 +36,16 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/icon.png",
+    apple: "/icon.png",
+  },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "EcoRoute",
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
@@ -46,6 +56,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <meta name="theme-color" content="#0a0a0a" />
+      </head>
       <body className={inter.className}>
         <Providers>
           <div className="bg-gradient-radial-top"></div>

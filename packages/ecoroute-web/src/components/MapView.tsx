@@ -75,32 +75,17 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
   const [poiLoading, setPOILoading] = useState(false);
   const { theme, resolvedTheme } = useTheme();
 
-  const getStyle = (currentTheme: string) => ({
-    version: 8,
-    sources: {
-      'osm-tiles': {
-        type: 'raster',
-        tiles: [
-          currentTheme === 'dark' 
-            ? 'https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
-            : 'https://cartodb-basemaps-a.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png'
-        ],
-        tileSize: 256,
-        attribution: '&copy; CartoDB contributors'
-      }
-    },
-    layers: [{
-      id: 'osm-tiles', type: 'raster', source: 'osm-tiles',
-      minzoom: 0, maxzoom: 19
-    }]
-  });
+  const getStyle = (currentTheme: string) => 
+    currentTheme === 'dark' 
+      ? 'https://tiles.openfreemap.org/styles/dark' 
+      : 'https://tiles.openfreemap.org/styles/liberty';
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: getStyle(resolvedTheme || 'dark') as any,
+      style: getStyle(resolvedTheme || 'dark'),
       center: [0, 20],
       zoom: 2,
       attributionControl: false
@@ -113,6 +98,11 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       if (!map.current) return;
       mapReady.current = true;
       setupLayers();
+      
+      // Initial color injection
+      if (resolvedTheme === 'dark') {
+        injectDarkColors();
+      }
     });
 
     return () => {
@@ -122,6 +112,19 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       mapReady.current = false;
     };
   }, []);
+
+  const injectDarkColors = () => {
+    if (!map.current) return;
+    try {
+      // Inject rich colors into the "dark" style
+      map.current.setPaintProperty('water', 'fill-color', '#1e293b'); // Deep Navy
+      map.current.setPaintProperty('landuse_park', 'fill-color', '#064e3b'); // Forest Green
+      map.current.setPaintProperty('landcover_wood', 'fill-color', '#064e3b');
+      map.current.setPaintProperty('building', 'fill-color', '#111111'); // Dark building
+    } catch (e) {
+      // Layers might not exist in all styles
+    }
+  };
 
   const setupLayers = () => {
     if (!map.current) return;
@@ -172,13 +175,14 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
   useEffect(() => {
     if (!map.current || !mapReady.current) return;
     
-    // When style changes, we lose sources/layers, so we must re-add them
     const currentTheme = resolvedTheme || 'dark';
-    map.current.setStyle(getStyle(currentTheme) as any);
+    map.current.setStyle(getStyle(currentTheme));
     
     map.current.once('styledata', () => {
+      if (currentTheme === 'dark') {
+        injectDarkColors();
+      }
       setupLayers();
-      // Re-trigger geometry render
       if (routeGeometries) {
         updateRouteData(routeGeometries);
       }
@@ -323,8 +327,14 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
         </div>
       )}
 
-      <div className="absolute bottom-3 left-3 z-10 glass-panel bg-[var(--surface-glass)] px-3 py-1.5 shadow-md text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-        EcoRoute • MapLibre GL + OSRM
+      <div className="absolute bottom-3 left-3 z-10 glass-panel bg-[var(--surface-glass)] px-3 py-1.5 shadow-md text-[9px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+        <span>EcoRoute</span>
+        <span className="opacity-40">•</span>
+        <span>MapLibre GL</span>
+        <span className="opacity-40">•</span>
+        <span>OpenFreeMap</span>
+        <span className="opacity-40">•</span>
+        <span>OSRM</span>
       </div>
     </div>
   );

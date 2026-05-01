@@ -20,8 +20,8 @@ dependencies = [
     "sentry-sdk[fastapi]>=2.0.0",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=9.0.3",
     "httpx>=0.28.1",
 ]

@@ -111,17 +111,17 @@ jobs:
       - name: Build Rust Core (Production Build)
         run: |
           cd packages/ecoroute-core
-          uv pip install maturin
+          uv pip install --system maturin
           maturin build --release --out dist
-          uv pip install dist/*.whl
+          uv pip install --system dist/*.whl
         env:
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
           
       - name: Install API Dependencies
         run: |
           cd packages/ecoroute-api
-          uv pip install -e .
-          uv pip install pytest pytest-asyncio httpx
+          uv pip install --system -e .
+          uv pip install --system pytest pytest-asyncio httpx
           
       - name: Run Integration Tests
         run: |
@@ -181,7 +181,7 @@ jobs:
       - name: Install Dependencies
         run: |
           cd packages/ecoroute-agent
-          uv pip install .
+          uv pip install --system .
       - name: Agent Check
         run: |
           cd packages/ecoroute-agent

@@ -49,18 +49,19 @@ function decodePolyline(encoded: string): [number, number][] {
   return coords;
 }
 
-// Primary: Valhalla (reliable, free, hosted by OSM DE)
-async function fetchValhallaRoute(
+// Fetch a single Valhalla route with specific costing options
+async function fetchValhallaWithCosting(
   originLat: number, originLon: number,
-  destLat: number, destLon: number
-): Promise<RouteGeometry[]> {
+  destLat: number, destLon: number,
+  costingOptions: object
+): Promise<RouteGeometry> {
   const body = JSON.stringify({
     locations: [
       { lat: originLat, lon: originLon },
       { lat: destLat, lon: destLon }
     ],
     costing: "auto",
-    alternates: 2,
+    costing_options: { auto: costingOptions },
     units: "kilometers"
   });
 
@@ -72,64 +73,50 @@ async function fetchValhallaRoute(
   const data = await res.json();
   
   if (!data.trip?.legs?.length) {
-    throw new Error('Could not find a driving route between these locations.');
+    throw new Error('Could not find a driving route.');
   }
 
-  // Primary route
-  const routes: RouteGeometry[] = [];
-  const primaryShape = data.trip.legs[0].shape;
-  routes.push({
-    coordinates: decodePolyline(primaryShape),
+  return {
+    coordinates: decodePolyline(data.trip.legs[0].shape),
     distance_km: data.trip.summary.length,
     duration_min: data.trip.summary.time / 60,
-  });
-
-  // Check for alternates
-  if (data.alternates?.length) {
-    for (const alt of data.alternates) {
-      if (alt.trip?.legs?.[0]?.shape) {
-        routes.push({
-          coordinates: decodePolyline(alt.trip.legs[0].shape),
-          distance_km: alt.trip.summary.length,
-          duration_min: alt.trip.summary.time / 60,
-        });
-      }
-    }
-  }
-
-  return routes;
+  };
 }
 
-// Fallback: OSRM
+// Fetch dual routes: eco-friendly vs standard
+async function fetchDualRoutes(
+  originLat: number, originLon: number,
+  destLat: number, destLon: number
+): Promise<{ eco: RouteGeometry; standard: RouteGeometry }> {
+  // Eco: avoid highways, prefer shorter distance, penalize tolls
+  const ecoOptions = { use_highways: 0.1, use_tolls: 0.1, top_speed: 80 };
+  // Standard: prefer highways and fastest path
+  const stdOptions = { use_highways: 1.0, use_tolls: 0.5 };
+
+  // Fetch both routes in parallel
+  const [eco, standard] = await Promise.all([
+    fetchValhallaWithCosting(originLat, originLon, destLat, destLon, ecoOptions),
+    fetchValhallaWithCosting(originLat, originLon, destLat, destLon, stdOptions),
+  ]);
+
+  return { eco, standard };
+}
+
+// Fallback: OSRM (single route)
 async function fetchOSRMRoute(
   originLat: number, originLon: number,
   destLat: number, destLon: number
-): Promise<RouteGeometry[]> {
+): Promise<RouteGeometry> {
   const url = `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&alternatives=true`;
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error(`OSRM error (${res.status})`);
   const data = await res.json();
   if (data.code !== 'Ok' || !data.routes?.length) throw new Error('OSRM: no route found');
-  return data.routes.map((r: any) => ({
-    coordinates: r.geometry.coordinates,
-    distance_km: r.distance / 1000,
-    duration_min: r.duration / 60,
-  }));
-}
-
-// Multi-provider route fetcher with fallback
-async function fetchRoute(
-  originLat: number, originLon: number,
-  destLat: number, destLon: number
-): Promise<RouteGeometry[]> {
-  // Try Valhalla first (most reliable)
-  try {
-    return await fetchValhallaRoute(originLat, originLon, destLat, destLon);
-  } catch (e) {
-    console.warn('Valhalla failed, trying OSRM:', e);
-  }
-  // Fallback to OSRM
-  return await fetchOSRMRoute(originLat, originLon, destLat, destLon);
+  return {
+    coordinates: data.routes[0].geometry.coordinates,
+    distance_km: data.routes[0].distance / 1000,
+    duration_min: data.routes[0].duration / 60,
+  };
 }
 
 export default function ComparePage() {
@@ -230,22 +217,24 @@ export default function ComparePage() {
       setOriginCoords(origin);
       setDestCoords(dest);
 
-      // 2. Get routes (Valhalla → OSRM fallback)
-      const routes = await fetchRoute(origin.lat, origin.lon, dest.lat, dest.lon);
-      const primaryRoute = routes[0];
-      let altRoute = routes.length > 1 ? routes[1] : null;
-      
-      if (!altRoute) {
-        // Fake a slightly longer route for comparison
-        altRoute = {
-          ...primaryRoute,
-          coordinates: [...primaryRoute.coordinates],
-          distance_km: primaryRoute.distance_km * 1.15,
-          duration_min: primaryRoute.duration_min * 1.10,
-        };
+      // 2. Get two different routes: eco vs standard
+      try {
+        const dualRoutes = await fetchDualRoutes(origin.lat, origin.lon, dest.lat, dest.lon);
+        setRawRoutes(dualRoutes);
+      } catch (e) {
+        console.warn('Valhalla dual-route failed, trying OSRM fallback:', e);
+        // Fallback: single OSRM route with simulated difference
+        const route = await fetchOSRMRoute(origin.lat, origin.lon, dest.lat, dest.lon);
+        setRawRoutes({
+          eco: route,
+          standard: {
+            ...route,
+            coordinates: [...route.coordinates],
+            distance_km: route.distance_km * 1.15,
+            duration_min: route.duration_min * 0.92,
+          },
+        });
       }
-
-      setRawRoutes({ eco: primaryRoute, standard: altRoute });
 
     } catch (err: any) {
       console.error('Route calculation error:', err);

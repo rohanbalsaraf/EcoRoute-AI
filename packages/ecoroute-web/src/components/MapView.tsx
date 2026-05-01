@@ -23,28 +23,29 @@ const POI_CATEGORIES = [
   { id: 'cinema',   label: 'Cinema',     emoji: '🎬', query: 'amenity=cinema' },
 ];
 
-async function fetchPOIs(bounds: maplibregl.LngLatBounds, categories: string[]): Promise<any[]> {
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
+async function fetchPOIs(center: {lat: number, lng: number}, categories: string[]): Promise<any[]> {
+  // Query within ~5km radius of the map center
+  const radius = 5000; // meters
   
   const filters = categories
     .map(catId => {
       const cat = POI_CATEGORIES.find(c => c.id === catId);
       if (!cat) return '';
       const [key, val] = cat.query.split('=');
-      return `node["${key}"="${val}"](${bbox});`;
+      return `node["${key}"="${val}"](around:${radius},${center.lat},${center.lng});`;
     })
     .join('\n');
 
-  const query = `[out:json][timeout:10];(${filters});out body 30;`;
+  const query = `[out:json][timeout:15];(${filters});out body 50;`;
   
   try {
     const res = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
       body: `data=${encodeURIComponent(query)}`,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: AbortSignal.timeout(15000),
     });
+    if (!res.ok) throw new Error(`Overpass error ${res.status}`);
     const data = await res.json();
     return data.elements || [];
   } catch (e) {
@@ -203,7 +204,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     map.current.setPaintProperty('std-route-glow', 'line-opacity', !isEco ? 0.2 : 0.05);
   }, [selectedRoute]);
 
-  // Load POIs when categories change
+  // Load POIs when categories change or map moves
   useEffect(() => {
     // Clear existing POI markers
     poiMarkersRef.current.forEach(m => m.remove());
@@ -211,10 +212,19 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
 
     if (!map.current || !mapReady.current || activePOIs.length === 0 || !routeGeometries) return;
 
+    let cancelled = false;
+
     const loadPOIs = async () => {
+      if (!map.current || cancelled) return;
       setPOILoading(true);
-      const bounds = map.current!.getBounds();
-      const pois = await fetchPOIs(bounds, activePOIs);
+      const center = map.current.getCenter();
+      const pois = await fetchPOIs({ lat: center.lat, lng: center.lng }, activePOIs);
+      
+      if (cancelled || !map.current) return;
+
+      // Clear old markers before adding new ones
+      poiMarkersRef.current.forEach(m => m.remove());
+      poiMarkersRef.current = [];
       
       pois.forEach(poi => {
         if (!poi.lat || !poi.lon || !map.current) return;
@@ -223,7 +233,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
         const name = poi.tags?.name || '';
         
         const el = document.createElement('div');
-        el.style.cssText = 'cursor:pointer;font-size:18px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5));transition:transform 0.2s;';
+        el.style.cssText = 'cursor:pointer;font-size:20px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5));transition:transform 0.2s;';
         el.textContent = emoji;
         el.title = name;
         el.onmouseenter = () => { el.style.transform = 'scale(1.4)'; };
@@ -234,7 +244,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
         
         if (name) {
           marker.setPopup(new maplibregl.Popup({ offset: 15, closeButton: false })
-            .setHTML(`<div style="font-size:12px;font-weight:600;padding:2px 4px;">${emoji} ${name}</div>`));
+            .setHTML(`<div style="font-size:12px;font-weight:600;padding:4px 8px;">${emoji} ${name}</div>`));
         }
         
         marker.addTo(map.current!);
@@ -244,7 +254,17 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       setPOILoading(false);
     };
 
+    // Load immediately
     loadPOIs();
+
+    // Re-load when user pans/zooms
+    const onMoveEnd = () => { loadPOIs(); };
+    map.current.on('moveend', onMoveEnd);
+
+    return () => {
+      cancelled = true;
+      map.current?.off('moveend', onMoveEnd);
+    };
   }, [activePOIs, routeGeometries]);
 
   const togglePOI = (catId: string) => {

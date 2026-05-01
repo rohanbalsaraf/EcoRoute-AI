@@ -161,7 +161,7 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:8000
           
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: pnpm --filter ecoroute-web exec playwright install --with-deps
         
       - name: Run E2E Smoke Test
         run: pnpm --filter ecoroute-web run test:e2e

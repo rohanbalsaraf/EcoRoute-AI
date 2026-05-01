@@ -5,8 +5,8 @@ test('has title', async ({ page }) => {
   await expect(page).toHaveTitle(/EcoRoute/);
 });
 
-test('get started link', async ({ page }) => {
+test('get api key link', async ({ page }) => {
   await page.goto('http://localhost:3000/');
-  await page.getByRole('link', { name: /Get Started/i }).first().click();
+  await page.getByRole('link', { name: /Get API Key/i }).first().click();
   await expect(page).toHaveURL(/.*sign-up/);
 });

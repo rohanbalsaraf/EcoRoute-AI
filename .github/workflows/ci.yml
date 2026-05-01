@@ -23,7 +23,7 @@ jobs:
           
       - name: Lint Python (API & Agent)
         run: |
-          uv run ruff check .
+          uvx ruff check .
           
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -181,12 +181,12 @@ jobs:
       - name: Install Dependencies
         run: |
           cd packages/ecoroute-agent
-          uv pip install --system .
+          uv pip install --system ../ecoroute-sdk .
       - name: Agent Check
         run: |
           cd packages/ecoroute-agent
           # Add agent-specific validation (e.g., ruff, pytest)
-          uv run ruff check .
+          uvx ruff check .
 
   mobile-check:
     name: Mobile (Expo) Check

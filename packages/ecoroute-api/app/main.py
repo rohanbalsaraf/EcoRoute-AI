@@ -4,9 +4,17 @@ import os
 import time
 import redis
 import json
+import sentry_sdk
 from fastapi import FastAPI, Depends, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+
+# Initialize Sentry
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN", "https://placeholder-dsn@sentry.io/123"),
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
 
 from .auth import get_current_user, verify_api_key, UserSchema
 from .database import get_db

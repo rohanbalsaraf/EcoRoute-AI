@@ -4,11 +4,12 @@ interface RouteCardProps {
     duration: string;
     carbon: string;
     isEco: boolean;
+    isFastest?: boolean;
   };
 }
 
 export default function RouteCard({ data }: RouteCardProps) {
-  const { isEco, distance, duration, carbon } = data;
+  const { isEco, isFastest, distance, duration, carbon } = data;
   
   return (
     <div className={`p-3 rounded-lg border transition-all ${isEco ? 'bg-[rgba(0,255,163,0.05)] border-[var(--neon-green)] shadow-[0_0_10px_rgba(0,255,163,0.1)]' : 'bg-[var(--surface-glass)] border-[var(--border-subtle)]'}`}>
@@ -27,7 +28,10 @@ export default function RouteCard({ data }: RouteCardProps) {
             {isEco ? 'Eco-Friendly Route' : 'Standard Route'}
           </h4>
         </div>
-        {isEco && <span className="text-[10px] font-bold px-1.5 py-0.5 bg-[var(--neon-green)] text-white dark:text-black rounded">RECOMMENDED</span>}
+        <div className="flex gap-1.5">
+          {isFastest && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[#F97316] text-white rounded">FASTEST</span>}
+          {isEco && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[var(--neon-green)] text-white dark:text-black rounded">RECOMMENDED</span>}
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2">

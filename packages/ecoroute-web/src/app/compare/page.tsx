@@ -184,6 +184,7 @@ export default function ComparePage() {
         carbon: `${ecoCarbonKg.toFixed(2)} kg`,
         carbonVal: ecoCarbonKg,
         isEco: true,
+        isFastest: ecoTimeMins < stdTimeMins,
       },
       standard: {
         distance: `${stdDistKm.toFixed(1)} km`,
@@ -191,6 +192,7 @@ export default function ComparePage() {
         carbon: `${stdCarbonKg.toFixed(2)} kg`,
         carbonVal: stdCarbonKg,
         isEco: false,
+        isFastest: stdTimeMins <= ecoTimeMins,
       },
       totalDistance: ecoDistKm,
       vehicle: vehicleData,

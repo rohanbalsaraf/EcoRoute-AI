@@ -39,7 +39,7 @@ export default function PricingPage() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8 relative z-10">
         <div className="mx-auto max-w-4xl text-center">
           <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-[var(--neon-green)] mb-4">Pricing Plans</h2>
-          <p className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl mb-6">
+          <p className="text-4xl font-extrabold tracking-tight text-[var(--text-primary)] sm:text-6xl mb-6">
             Scale your <span className="text-glow-green">impact</span>
           </p>
           <p className="mx-auto max-w-2xl text-lg leading-8 text-[var(--text-secondary)]">
@@ -50,19 +50,19 @@ export default function PricingPage() {
         <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-2 lg:gap-x-8 xl:gap-x-12 px-4">
           
           {/* Free Tier */}
-          <div className="glass-panel p-8 flex flex-col border-[var(--border-subtle)] hover:border-[var(--border-glow-green)] transition-all duration-500 group">
+          <div className="glass-panel p-8 flex flex-col border-[var(--border-subtle)] hover:border-[var(--border-glow-green)] transition-all duration-500 group bg-[var(--surface-glass)]">
             <div className="mb-8">
-              <h3 className="text-xl font-bold text-white group-hover:text-[var(--neon-green)] transition-colors">Developer</h3>
+              <h3 className="text-xl font-bold text-[var(--text-primary)] group-hover:text-[var(--neon-green)] transition-colors">Developer</h3>
               <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">Ideal for development, testing, and small-scale experiments.</p>
               <div className="mt-6 flex items-baseline gap-x-1">
-                <span className="text-5xl font-extrabold tracking-tight text-white">$0</span>
+                <span className="text-5xl font-extrabold tracking-tight text-[var(--text-primary)]">$0</span>
                 <span className="text-sm font-medium leading-6 text-[var(--text-secondary)]">/month</span>
               </div>
             </div>
             
             <Link
               href={isSignedIn ? "/dashboard" : "/sign-up"}
-              className="btn-secondary w-full py-3 text-center text-sm font-bold mb-8"
+              className="btn-glass w-full py-3 text-center text-sm font-bold mb-8 hover:border-[var(--neon-green)]"
             >
               {isSignedIn ? "Go to Dashboard" : "Get Started Free"}
             </Link>
@@ -85,16 +85,16 @@ export default function PricingPage() {
           </div>
 
           {/* Pro Tier */}
-          <div className="glass-panel p-8 flex flex-col border-[var(--neon-purple)] shadow-[0_0_40px_rgba(168,85,247,0.15)] relative overflow-hidden group">
+          <div className="glass-panel p-8 flex flex-col border-[var(--neon-purple)] shadow-[0_0_40px_rgba(168,85,247,0.15)] relative overflow-hidden group bg-[var(--surface-glass)]">
             <div className="absolute top-0 right-0 bg-[var(--neon-purple)] text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase tracking-wider">
               Recommended
             </div>
             
             <div className="mb-8">
-              <h3 className="text-xl font-bold text-white group-hover:text-[var(--neon-purple)] transition-colors">Production</h3>
+              <h3 className="text-xl font-bold text-[var(--text-primary)] group-hover:text-[var(--neon-purple)] transition-colors">Production</h3>
               <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">High-performance routing for commercial logistics and scaling startups.</p>
               <div className="mt-6 flex items-baseline gap-x-1">
-                <span className="text-5xl font-extrabold tracking-tight text-white">$49</span>
+                <span className="text-5xl font-extrabold tracking-tight text-[var(--text-primary)]">$49</span>
                 <span className="text-sm font-medium leading-6 text-[var(--text-secondary)]">/month</span>
               </div>
             </div>
@@ -102,7 +102,7 @@ export default function PricingPage() {
             <button
               onClick={handleUpgrade}
               disabled={loading}
-              className="btn-primary w-full py-3 text-sm font-bold mb-8 bg-[var(--neon-purple)] shadow-[0_0_15px_rgba(168,85,247,0.4)] border-none hover:bg-purple-500"
+              className="btn-primary w-full py-3 text-sm font-bold mb-8 bg-[var(--neon-purple)] shadow-[0_0_15px_rgba(168,85,247,0.4)] border-none hover:bg-purple-500 text-white"
             >
               {loading ? "Initializing..." : "Upgrade to Pro"}
             </button>
@@ -119,7 +119,7 @@ export default function PricingPage() {
                   <svg className="h-5 w-5 flex-none text-[var(--neon-purple)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-white font-medium">{feature}</span>
+                  <span className="text-[var(--text-primary)] font-medium">{feature}</span>
                 </li>
               ))}
             </ul>

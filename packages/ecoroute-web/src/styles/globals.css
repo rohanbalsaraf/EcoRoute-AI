@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  /* Default Dark Theme */
   --background: #050505;
   --surface: #111111;
   --surface-glass: rgba(17, 17, 17, 0.6);
@@ -12,10 +13,28 @@
   --neon-purple: #7B61FF;
   --neon-purple-glow: rgba(123, 97, 255, 0.4);
   
-  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --skeleton-shimmer: rgba(255, 255, 255, 0.05);
   --border-glow-green: rgba(0, 255, 163, 0.3);
   
   --transition-smooth: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme='light'] {
+  --background: #F8F9FA;
+  --surface: #FFFFFF;
+  --surface-glass: rgba(255, 255, 255, 0.7);
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B7280;
+  
+  --neon-green: #059669; /* Darker green for accessibility on light */
+  --neon-green-glow: rgba(5, 150, 105, 0.2);
+  --neon-purple: #6366F1;
+  --neon-purple-glow: rgba(99, 102, 241, 0.2);
+  
+  --border-subtle: rgba(0, 0, 0, 0.1);
+  --skeleton-shimmer: rgba(0, 0, 0, 0.03);
+  --border-glow-green: rgba(5, 150, 105, 0.2);
 }
 
 body {
@@ -27,6 +46,7 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Glassmorphism Utilities */
@@ -36,6 +56,7 @@ body {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 /* Glowing text and borders */
@@ -72,8 +93,8 @@ body {
 /* Base button styles */
 .btn-primary {
   background: var(--neon-green);
-  color: #000;
-  font-weight: 500;
+  color: #FFFFFF; /* Keep white for contrast on green */
+  font-weight: 600;
   font-size: 0.875rem;
   padding: 8px 16px;
   border-radius: 6px;
@@ -83,10 +104,14 @@ body {
   box-shadow: 0 0 10px transparent;
 }
 
+[data-theme='dark'] .btn-primary {
+  color: #000000;
+}
+
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 10px var(--neon-green-glow);
-  background: #00e693;
+  filter: brightness(1.1);
 }
 
 .btn-glass {
@@ -101,8 +126,8 @@ body {
 }
 
 .btn-glass:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--surface);
+  border-color: var(--text-secondary);
 }
 
 /* Background Gradients */
@@ -113,7 +138,7 @@ body {
   transform: translateX(-50%);
   width: 100vw;
   height: 50vh;
-  background: radial-gradient(circle, rgba(0, 255, 163, 0.1) 0%, rgba(5, 5, 5, 0) 70%);
+  background: radial-gradient(circle, var(--neon-green-glow) 0%, transparent 70%);
   pointer-events: none;
   z-index: -1;
 }
@@ -142,7 +167,7 @@ body {
 .skeleton {
   background: linear-gradient(90deg, 
     var(--surface) 25%, 
-    rgba(255, 255, 255, 0.05) 50%, 
+    var(--skeleton-shimmer) 50%, 
     var(--surface) 75%
   );
   background-size: 200% 100%;

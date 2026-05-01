@@ -287,7 +287,7 @@ export default function ComparePage() {
         {/* Left Control Panel */}
         <div className="w-full lg:w-1/3 flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-2">
           <div>
-            <h1 className="text-2xl font-bold mb-1 text-white">API Playground</h1>
+            <h1 className="text-2xl font-bold mb-1 text-[var(--text-primary)]">API Playground</h1>
             <p className="text-[var(--text-secondary)] text-xs mb-4">
               Test the EcoRoute API in real-time. Enter any two locations worldwide.
             </p>
@@ -295,7 +295,7 @@ export default function ComparePage() {
           </div>
 
           {/* Vehicle Selector */}
-          <div className="glass-panel p-3">
+          <div className="glass-panel p-3 bg-[var(--surface-glass)]">
             <h4 className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Your Vehicle</h4>
             <div className="grid grid-cols-3 gap-1.5">
               {VEHICLES.map(v => (
@@ -304,8 +304,8 @@ export default function ComparePage() {
                   onClick={() => setSelectedVehicle(v.id)}
                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all border ${
                     selectedVehicle === v.id 
-                      ? 'bg-[rgba(0,255,163,0.1)] border-[var(--neon-green)] text-white shadow-[0_0_8px_rgba(0,255,163,0.15)]' 
-                      : 'bg-[var(--surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-white/20 hover:text-white'
+                      ? 'bg-[rgba(0,255,163,0.1)] border-[var(--neon-green)] text-[var(--text-primary)] shadow-[0_0_8px_rgba(0,255,163,0.15)]' 
+                      : 'bg-[var(--surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <span className="text-sm">{v.icon}</span>
@@ -314,7 +314,7 @@ export default function ComparePage() {
               ))}
             </div>
             <p className="text-[9px] text-[var(--text-secondary)] mt-2">
-              CO₂: <span className="text-white font-semibold">{VEHICLES.find(v => v.id === selectedVehicle)?.factor} kg/km</span>
+              CO₂: <span className="text-[var(--text-primary)] font-semibold">{VEHICLES.find(v => v.id === selectedVehicle)?.factor} kg/km</span>
               {' • '}Eco Saving: <span className="text-[var(--neon-green)] font-semibold">{((VEHICLES.find(v => v.id === selectedVehicle)?.ecoSaving || 0) * 100).toFixed(0)}%</span>
               {selectedVehicle === 'ev' && <span className="text-[var(--neon-green)] ml-1">• Near-Zero!</span>}
             </p>
@@ -333,14 +333,14 @@ export default function ComparePage() {
             <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
               
               {/* Trip Summary */}
-              <div className="glass-panel p-4 flex items-center justify-between">
+              <div className="glass-panel p-4 flex items-center justify-between bg-[var(--surface-glass)]">
                 <div>
                   <p className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Total Distance</p>
-                  <p className="text-2xl font-extrabold text-white">{results.totalDistance.toFixed(1)} <span className="text-sm font-medium text-[var(--text-secondary)]">km</span></p>
+                  <p className="text-2xl font-extrabold text-[var(--text-primary)]">{results.totalDistance.toFixed(1)} <span className="text-sm font-medium text-[var(--text-secondary)]">km</span></p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Vehicle</p>
-                  <p className="text-lg font-bold text-white flex items-center gap-1 justify-end">
+                  <p className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-1 justify-end">
                     <span>{results.vehicle.icon}</span> {results.vehicle.label}
                   </p>
                 </div>
@@ -353,13 +353,13 @@ export default function ComparePage() {
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Select Your Route</h3>
                 <div 
                   onClick={() => setSelectedRoute("eco")} 
-                  className={`cursor-pointer transition-all rounded-lg ${selectedRoute === "eco" ? "ring-2 ring-[var(--neon-green)] ring-offset-1 ring-offset-[var(--bg-primary)]" : "opacity-70 hover:opacity-100"}`}
+                  className={`cursor-pointer transition-all rounded-lg ${selectedRoute === "eco" ? "ring-2 ring-[var(--neon-green)] ring-offset-1 ring-offset-[var(--background)]" : "opacity-70 hover:opacity-100"}`}
                 >
                   <RouteCard data={results.eco} />
                 </div>
                 <div 
                   onClick={() => setSelectedRoute("standard")} 
-                  className={`cursor-pointer transition-all rounded-lg ${selectedRoute === "standard" ? "ring-2 ring-[#F97316] ring-offset-1 ring-offset-[var(--bg-primary)]" : "opacity-70 hover:opacity-100"}`}
+                  className={`cursor-pointer transition-all rounded-lg ${selectedRoute === "standard" ? "ring-2 ring-[#F97316] ring-offset-1 ring-offset-[var(--background)]" : "opacity-70 hover:opacity-100"}`}
                 >
                   <RouteCard data={results.standard} />
                 </div>
@@ -367,22 +367,22 @@ export default function ComparePage() {
 
               {!isSignedIn && (
                 <div className="mt-4 glass-panel p-4 border-[var(--border-glow-green)] bg-[rgba(0,255,163,0.05)] animate-in fade-in slide-in-from-bottom-2 duration-700">
-                  <h4 className="text-sm font-bold text-white mb-2">Want to automate this?</h4>
+                  <h4 className="text-sm font-bold text-[var(--text-primary)] mb-2">Want to automate this?</h4>
                   <p className="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed">
                     Get your own **API Key** to integrate carbon-aware routing into your own software. Logged-in users get:
                   </p>
-                  <ul className="text-[11px] text-white/80 space-y-2 mb-4">
+                  <ul className="text-[11px] text-[var(--text-primary)] opacity-80 space-y-2 mb-4">
                     <li className="flex items-center gap-2">
-                      <span className="text-[var(--neon-green)]">✓</span> 100 free requests per day
+                      <span className="text-[var(--neon-green)] font-bold">✓</span> 100 free requests per day
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="text-[var(--neon-green)]">✓</span> Personal Analytics Dashboard
+                      <span className="text-[var(--neon-green)] font-bold">✓</span> Personal Analytics Dashboard
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="text-[var(--neon-green)]">✓</span> Commercial usage license
+                      <span className="text-[var(--neon-green)] font-bold">✓</span> Commercial usage license
                     </li>
                   </ul>
-                  <Link href="/sign-up" className="btn-primary w-full text-center py-2 text-xs block">
+                  <Link href="/sign-up" className="btn-primary w-full text-center py-2 text-xs block text-white">
                     Get Started for Free
                   </Link>
                 </div>

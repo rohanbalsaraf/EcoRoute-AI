@@ -90,7 +90,7 @@ function AutocompleteInput({
         onChange={(e) => { onChange(e.target.value); setShowDropdown(true); }}
         onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
         placeholder={placeholder}
-        className="w-full bg-[var(--surface)] text-sm border border-[var(--border-subtle)] text-white rounded-md pl-7 pr-16 py-2 focus:outline-none focus:border-[var(--neon-green)] focus:ring-1 focus:ring-[var(--neon-green)] transition-all"
+        className="w-full bg-[var(--surface)] text-sm border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-md pl-7 pr-16 py-2 focus:outline-none focus:border-[var(--neon-green)] focus:ring-1 focus:ring-[var(--neon-green)] transition-all placeholder:text-[var(--text-secondary)] opacity-80 focus:opacity-100"
       />
       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
         {isFetching && (
@@ -117,7 +117,7 @@ function AutocompleteInput({
             <li
               key={i}
               onClick={() => { onChange(s.display_name); setShowDropdown(false); }}
-              className="px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-glass)] hover:text-white cursor-pointer transition-colors border-b border-[var(--border-subtle)] last:border-b-0 flex items-start gap-2"
+              className="px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-glass)] hover:text-[var(--text-primary)] cursor-pointer transition-colors border-b border-[var(--border-subtle)] last:border-b-0 flex items-start gap-2"
             >
               <svg className="w-3 h-3 mt-0.5 shrink-0 text-[var(--neon-green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
               <span className="line-clamp-2">{s.display_name}</span>

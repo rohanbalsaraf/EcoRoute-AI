@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { useTheme } from 'next-themes';
 
 interface MapViewProps {
   isActive: boolean;
@@ -72,27 +73,34 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
   const mapReady = useRef(false);
   const [activePOIs, setActivePOIs] = useState<string[]>([]);
   const [poiLoading, setPOILoading] = useState(false);
+  const { theme, resolvedTheme } = useTheme();
+
+  const getStyle = (currentTheme: string) => ({
+    version: 8,
+    sources: {
+      'osm-tiles': {
+        type: 'raster',
+        tiles: [
+          currentTheme === 'dark' 
+            ? 'https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
+            : 'https://cartodb-basemaps-a.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png'
+        ],
+        tileSize: 256,
+        attribution: '&copy; CartoDB contributors'
+      }
+    },
+    layers: [{
+      id: 'osm-tiles', type: 'raster', source: 'osm-tiles',
+      minzoom: 0, maxzoom: 19
+    }]
+  });
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          'osm-tiles': {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors'
-          }
-        },
-        layers: [{
-          id: 'osm-tiles', type: 'raster', source: 'osm-tiles',
-          minzoom: 0, maxzoom: 19
-        }]
-      },
+      style: getStyle(resolvedTheme || 'dark') as any,
       center: [0, 20],
       zoom: 2,
       attributionControl: false
@@ -104,47 +112,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     map.current.on('load', () => {
       if (!map.current) return;
       mapReady.current = true;
-
-      // Standard route (underneath)
-      map.current.addSource('std-route', {
-        type: 'geojson',
-        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
-      });
-      map.current.addLayer({
-        id: 'std-route-glow', type: 'line', source: 'std-route',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#F97316', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
-      });
-      map.current.addLayer({
-        id: 'std-route-line', type: 'line', source: 'std-route',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#F97316', 'line-width': 5, 'line-opacity': 0.8 }
-      });
-
-      // Eco route (on top)
-      map.current.addSource('eco-route', {
-        type: 'geojson',
-        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
-      });
-      map.current.addLayer({
-        id: 'eco-route-glow', type: 'line', source: 'eco-route',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#00FFA3', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
-      });
-      map.current.addLayer({
-        id: 'eco-route-line', type: 'line', source: 'eco-route',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#00FFA3', 'line-width': 5, 'line-opacity': 0.9 }
-      });
-
-      // Markers
-      const originEl = document.createElement('div');
-      originEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
-      markersRef.current.origin = new maplibregl.Marker({ element: originEl, anchor: 'center' });
-
-      const destEl = document.createElement('div');
-      destEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#EF4444;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
-      markersRef.current.dest = new maplibregl.Marker({ element: destEl, anchor: 'center' });
+      setupLayers();
     });
 
     return () => {
@@ -155,38 +123,91 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     };
   }, []);
 
-  // Render routes
+  const setupLayers = () => {
+    if (!map.current) return;
+    
+    // Standard route (underneath)
+    map.current.addSource('std-route', {
+      type: 'geojson',
+      data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+    });
+    map.current.addLayer({
+      id: 'std-route-glow', type: 'line', source: 'std-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#F97316', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
+    });
+    map.current.addLayer({
+      id: 'std-route-line', type: 'line', source: 'std-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#F97316', 'line-width': 5, 'line-opacity': 0.8 }
+    });
+
+    // Eco route (on top)
+    map.current.addSource('eco-route', {
+      type: 'geojson',
+      data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+    });
+    map.current.addLayer({
+      id: 'eco-route-glow', type: 'line', source: 'eco-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#00FFA3', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
+    });
+    map.current.addLayer({
+      id: 'eco-route-line', type: 'line', source: 'eco-route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#00FFA3', 'line-width': 5, 'line-opacity': 0.9 }
+    });
+
+    // Markers
+    const originEl = document.createElement('div');
+    originEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
+    markersRef.current.origin = new maplibregl.Marker({ element: originEl, anchor: 'center' });
+
+    const destEl = document.createElement('div');
+    destEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#EF4444;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
+    markersRef.current.dest = new maplibregl.Marker({ element: destEl, anchor: 'center' });
+  };
+
+  // Sync theme
   useEffect(() => {
-    if (!map.current || !mapReady.current || !routeGeometries) return;
+    if (!map.current || !mapReady.current) return;
+    
+    // When style changes, we lose sources/layers, so we must re-add them
+    const currentTheme = resolvedTheme || 'dark';
+    map.current.setStyle(getStyle(currentTheme) as any);
+    
+    map.current.once('styledata', () => {
+      setupLayers();
+      // Re-trigger geometry render
+      if (routeGeometries) {
+        updateRouteData(routeGeometries);
+      }
+    });
+  }, [resolvedTheme]);
 
+  const updateRouteData = (geoms: { eco: [number, number][]; standard: [number, number][] }) => {
+    if (!map.current || !mapReady.current) return;
     const ecoSource = map.current.getSource('eco-route') as maplibregl.GeoJSONSource;
-    if (ecoSource) {
-      ecoSource.setData({
-        type: 'Feature', properties: {},
-        geometry: { type: 'LineString', coordinates: routeGeometries.eco }
-      });
-    }
-
+    if (ecoSource) ecoSource.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: geoms.eco } });
+    
     const stdSource = map.current.getSource('std-route') as maplibregl.GeoJSONSource;
-    if (stdSource) {
-      stdSource.setData({
-        type: 'Feature', properties: {},
-        geometry: { type: 'LineString', coordinates: routeGeometries.standard }
-      });
-    }
+    if (stdSource) stdSource.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: geoms.standard } });
 
     if (originCoords && destCoords) {
+      if (markersRef.current.origin) markersRef.current.origin.setLngLat([originCoords.lon, originCoords.lat]).addTo(map.current);
+      if (markersRef.current.dest) markersRef.current.dest.setLngLat([destCoords.lon, destCoords.lat]).addTo(map.current);
+    }
+  };
+
+  useEffect(() => {
+    if (!routeGeometries) return;
+    updateRouteData(routeGeometries);
+    
+    if (originCoords && destCoords && map.current) {
       const bounds = new maplibregl.LngLatBounds();
       routeGeometries.eco.forEach(c => bounds.extend(c as [number, number]));
       routeGeometries.standard.forEach(c => bounds.extend(c as [number, number]));
       map.current.fitBounds(bounds, { padding: 60, duration: 1500 });
-
-      if (markersRef.current.origin) {
-        markersRef.current.origin.setLngLat([originCoords.lon, originCoords.lat]).addTo(map.current!);
-      }
-      if (markersRef.current.dest) {
-        markersRef.current.dest.setLngLat([destCoords.lon, destCoords.lat]).addTo(map.current!);
-      }
     }
   }, [routeGeometries, originCoords, destCoords]);
 
@@ -194,73 +215,53 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
   useEffect(() => {
     if (!map.current || !mapReady.current) return;
     const isEco = selectedRoute === "eco";
-    
-    map.current.setPaintProperty('eco-route-line', 'line-width', isEco ? 6 : 3);
-    map.current.setPaintProperty('eco-route-line', 'line-opacity', isEco ? 1 : 0.4);
-    map.current.setPaintProperty('eco-route-glow', 'line-opacity', isEco ? 0.2 : 0.05);
-    
-    map.current.setPaintProperty('std-route-line', 'line-width', !isEco ? 6 : 3);
-    map.current.setPaintProperty('std-route-line', 'line-opacity', !isEco ? 1 : 0.4);
-    map.current.setPaintProperty('std-route-glow', 'line-opacity', !isEco ? 0.2 : 0.05);
-  }, [selectedRoute]);
+    try {
+      map.current.setPaintProperty('eco-route-line', 'line-width', isEco ? 6 : 3);
+      map.current.setPaintProperty('eco-route-line', 'line-opacity', isEco ? 1 : 0.4);
+      map.current.setPaintProperty('eco-route-glow', 'line-opacity', isEco ? 0.2 : 0.05);
+      
+      map.current.setPaintProperty('std-route-line', 'line-width', !isEco ? 6 : 3);
+      map.current.setPaintProperty('std-route-line', 'line-opacity', !isEco ? 1 : 0.4);
+      map.current.setPaintProperty('std-route-glow', 'line-opacity', !isEco ? 0.2 : 0.05);
+    } catch (e) {
+      // Layers might be missing during style transition
+    }
+  }, [selectedRoute, resolvedTheme]);
 
   // Load POIs when categories change or map moves
   useEffect(() => {
-    // Clear existing POI markers
     poiMarkersRef.current.forEach(m => m.remove());
     poiMarkersRef.current = [];
-
     if (!map.current || !mapReady.current || activePOIs.length === 0 || !routeGeometries) return;
-
     let cancelled = false;
-
     const loadPOIs = async () => {
       if (!map.current || cancelled) return;
       setPOILoading(true);
       const center = map.current.getCenter();
       const pois = await fetchPOIs({ lat: center.lat, lng: center.lng }, activePOIs);
-      
       if (cancelled || !map.current) return;
-
-      // Clear old markers before adding new ones
       poiMarkersRef.current.forEach(m => m.remove());
       poiMarkersRef.current = [];
-      
       pois.forEach(poi => {
         if (!poi.lat || !poi.lon || !map.current) return;
-        
         const emoji = getPoiEmoji(poi.tags || {});
         const name = poi.tags?.name || '';
-        
         const el = document.createElement('div');
         el.style.cssText = 'cursor:pointer;font-size:20px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5));transition:transform 0.2s;';
         el.textContent = emoji;
         el.title = name;
         el.onmouseenter = () => { el.style.transform = 'scale(1.4)'; };
         el.onmouseleave = () => { el.style.transform = 'scale(1)'; };
-        
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([poi.lon, poi.lat]);
-        
-        if (name) {
-          marker.setPopup(new maplibregl.Popup({ offset: 15, closeButton: false })
-            .setHTML(`<div style="font-size:12px;font-weight:600;padding:4px 8px;">${emoji} ${name}</div>`));
-        }
-        
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([poi.lon, poi.lat]);
+        if (name) marker.setPopup(new maplibregl.Popup({ offset: 15, closeButton: false }).setHTML(`<div style="font-size:12px;font-weight:600;padding:4px 8px;background:var(--surface);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:4px;">${emoji} ${name}</div>`));
         marker.addTo(map.current!);
         poiMarkersRef.current.push(marker);
       });
-      
       setPOILoading(false);
     };
-
-    // Load immediately
     loadPOIs();
-
-    // Re-load when user pans/zooms
     const onMoveEnd = () => { loadPOIs(); };
     map.current.on('moveend', onMoveEnd);
-
     return () => {
       cancelled = true;
       map.current?.off('moveend', onMoveEnd);
@@ -268,9 +269,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
   }, [activePOIs, routeGeometries]);
 
   const togglePOI = (catId: string) => {
-    setActivePOIs(prev => 
-      prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
-    );
+    setActivePOIs(prev => prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]);
   };
 
   return (
@@ -278,28 +277,28 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       <div ref={mapContainer} className="w-full h-full absolute inset-0" />
       
       {isSearching && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-16 h-16 rounded-full border-4 border-gray-600 border-t-[#00FFA3] animate-spin"></div>
-          <p className="mt-4 text-[#00FFA3] font-semibold tracking-wider text-sm animate-pulse">CALCULATING ROUTES...</p>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[var(--background)] opacity-60 backdrop-blur-sm">
+          <div className="w-16 h-16 rounded-full border-4 border-[var(--border-subtle)] border-t-[var(--neon-green)] animate-spin"></div>
+          <p className="mt-4 text-[var(--neon-green)] font-semibold tracking-widest text-xs animate-pulse uppercase">Optimizing Routes...</p>
         </div>
       )}
 
       {/* Route Legend + POI Toggles */}
       {routeGeometries && (
-        <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-sm px-3 py-2.5 rounded-lg shadow-lg text-[11px] max-w-[180px]">
-          <p className="font-bold text-gray-800 text-[10px] uppercase tracking-wider mb-1.5">Routes</p>
+        <div className="absolute top-3 right-3 z-10 glass-panel bg-[var(--surface-glass)] px-3 py-2.5 shadow-lg text-[11px] max-w-[180px]">
+          <p className="font-bold text-[var(--text-primary)] text-[10px] uppercase tracking-wider mb-1.5">Routes</p>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-5 h-1 rounded-full bg-[#00FFA3]"></div>
-            <span className="text-gray-700 font-medium">Eco-Friendly</span>
+            <span className="text-[var(--text-secondary)] font-medium">Eco-Friendly</span>
           </div>
           <div className="flex items-center gap-2 mb-2">
             <div className="w-5 h-1 rounded-full bg-[#F97316]"></div>
-            <span className="text-gray-700 font-medium">Standard</span>
+            <span className="text-[var(--text-secondary)] font-medium">Standard</span>
           </div>
           
           {/* POI Toggles */}
-          <div className="border-t border-gray-200 pt-2">
-            <p className="font-bold text-gray-800 text-[10px] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+          <div className="border-t border-[var(--border-subtle)] pt-2">
+            <p className="font-bold text-[var(--text-primary)] text-[10px] uppercase tracking-wider mb-1.5 flex items-center gap-1">
               Nearby Places
               {poiLoading && <span className="inline-block w-2.5 h-2.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>}
             </p>
@@ -311,8 +310,8 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
                   title={cat.label}
                   className={`flex flex-col items-center py-1 rounded text-[10px] transition-all ${
                     activePOIs.includes(cat.id)
-                      ? 'bg-blue-50 text-blue-700 font-semibold'
-                      : 'text-gray-500 hover:bg-gray-100'
+                      ? 'bg-[rgba(123,97,255,0.1)] text-[var(--neon-purple)] font-semibold'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--surface)]'
                   }`}
                 >
                   <span className="text-base">{cat.emoji}</span>
@@ -324,7 +323,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
         </div>
       )}
 
-      <div className="absolute bottom-3 left-3 z-10 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-md text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
+      <div className="absolute bottom-3 left-3 z-10 glass-panel bg-[var(--surface-glass)] px-3 py-1.5 shadow-md text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
         EcoRoute • MapLibre GL + OSRM
       </div>
     </div>

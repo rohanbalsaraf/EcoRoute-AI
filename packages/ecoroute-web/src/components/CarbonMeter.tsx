@@ -8,8 +8,8 @@ export default function CarbonMeter({ ecoCarbon, stdCarbon }: CarbonMeterProps) 
   const percentage = Math.round(((stdCarbon - ecoCarbon) / stdCarbon) * 100);
 
   return (
-    <div className="glass-panel p-4 relative overflow-hidden">
-      <div className="absolute -right-4 -top-4 w-20 h-20 bg-[var(--neon-green)] rounded-full blur-[30px] opacity-20"></div>
+    <div className="glass-panel p-4 relative overflow-hidden bg-[var(--surface-glass)]">
+      <div className="absolute -right-4 -top-4 w-20 h-20 bg-[var(--neon-green)] rounded-full blur-[30px] opacity-10 dark:opacity-20"></div>
       
       <h4 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Environmental Impact</h4>
       <div className="flex items-end gap-2 mb-3">

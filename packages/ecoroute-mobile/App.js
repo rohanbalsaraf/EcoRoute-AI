@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Leaf, Navigation, Zap, Bike, Fuel, Activity, Clock, Map as MapIcon } from 'lucide-react-native';
 
@@ -16,8 +17,9 @@ export default function App() {
   const [selectedVehicle, setSelectedVehicle] = useState('ev');
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -110,7 +112,8 @@ export default function App() {
         <TouchableOpacity style={styles.navItem}><Activity size={24} color="#64748b" /></TouchableOpacity>
         <TouchableOpacity style={styles.navItem}><Leaf size={24} color="#64748b" /></TouchableOpacity>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

@@ -15,7 +15,10 @@
     "react-native": "0.81.5",
     "expo-linear-gradient": "~14.0.1",
     "lucide-react-native": "^0.378.0",
-    "react-native-svg": "15.8.0"
+    "react-native-svg": "15.8.0",
+    "expo-asset": "~11.0.1",
+    "expo-constants": "~17.0.3",
+    "react-native-safe-area-context": "5.0.0"
   },
   "private": true
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@clerk/nextjs";
 import SearchBar from "../../components/SearchBar";
 import MapView from "../../components/MapView";
@@ -38,7 +38,8 @@ async function fetchOSRMRoute(
   destLat: number, destLon: number
 ): Promise<RouteGeometry[]> {
   const url = `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&alternatives=true`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`Routing service error (${res.status}). Please try again.`);
   const data = await res.json();
 
   if (data.code !== 'Ok' || !data.routes?.length) {
@@ -76,7 +77,7 @@ async function fetchDetourRoute(
 }
 
 export default function ComparePage() {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [originCoords, setOriginCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -139,9 +140,16 @@ export default function ComparePage() {
     setSelectedRoute("eco");
     
     try {
-      // 1. Geocode
+      // 1. Geocode locations via Nominatim
       const geocode = async (query: string) => {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+          { 
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(10000)
+          }
+        );
+        if (!res.ok) throw new Error(`Geocoding service error (${res.status}). Please try again.`);
         const data = await res.json();
         if (data.length === 0) throw new Error(`Location not found: "${query}". Try a more specific name.`);
         return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
@@ -161,7 +169,6 @@ export default function ComparePage() {
         altRoute = await fetchDetourRoute(origin.lat, origin.lon, dest.lat, dest.lon);
       }
       if (!altRoute) {
-        // Last resort: fake a slightly longer route with same geometry
         altRoute = {
           ...primaryRoute,
           distance_km: primaryRoute.distance_km * 1.15,
@@ -172,8 +179,14 @@ export default function ComparePage() {
       setRawRoutes({ eco: primaryRoute, standard: altRoute });
 
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Failed to calculate route.");
+      console.error('Route calculation error:', err);
+      if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+        setError('Request timed out. Please check your internet and try again.');
+      } else if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('Network error — could not reach routing services. Check your internet connection.');
+      } else {
+        setError(err.message || "Failed to calculate route. Please try again.");
+      }
     } finally {
       setIsSearching(false);
     }

@@ -78,7 +78,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
   const getStyle = (currentTheme: string) => 
     currentTheme === 'dark' 
       ? 'https://tiles.openfreemap.org/styles/dark' 
-      : 'https://tiles.openfreemap.org/styles/liberty';
+      : 'https://tiles.openfreemap.org/styles/positron';
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
@@ -128,47 +128,64 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
 
   const setupLayers = () => {
     if (!map.current) return;
+    const isDark = resolvedTheme === 'dark';
+    const ecoColor = isDark ? '#00FFA3' : '#059669'; // Darker green for light mode
+    const stdColor = isDark ? '#F97316' : '#EA580C'; // Darker orange for light mode
     
     // Standard route (underneath)
-    map.current.addSource('std-route', {
-      type: 'geojson',
-      data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+    if (!map.current.getSource('std-route')) {
+      map.current.addSource('std-route', {
+        type: 'geojson',
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+      });
+    }
+    
+    // Clear existing layers if they exist (to avoid duplicates during theme switch)
+    ['std-route-glow', 'std-route-line', 'eco-route-glow', 'eco-route-line'].forEach(id => {
+      if (map.current?.getLayer(id)) map.current.removeLayer(id);
     });
+
     map.current.addLayer({
       id: 'std-route-glow', type: 'line', source: 'std-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#F97316', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
+      paint: { 'line-color': stdColor, 'line-width': 14, 'line-opacity': isDark ? 0.15 : 0.2, 'line-blur': 8 }
     });
     map.current.addLayer({
       id: 'std-route-line', type: 'line', source: 'std-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#F97316', 'line-width': 5, 'line-opacity': 0.8 }
+      paint: { 'line-color': stdColor, 'line-width': 8, 'line-opacity': 0.85 }
     });
 
     // Eco route (on top)
-    map.current.addSource('eco-route', {
-      type: 'geojson',
-      data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
-    });
+    if (!map.current.getSource('eco-route')) {
+      map.current.addSource('eco-route', {
+        type: 'geojson',
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+      });
+    }
     map.current.addLayer({
       id: 'eco-route-glow', type: 'line', source: 'eco-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#00FFA3', 'line-width': 14, 'line-opacity': 0.15, 'line-blur': 8 }
+      paint: { 'line-color': ecoColor, 'line-width': 14, 'line-opacity': isDark ? 0.15 : 0.2, 'line-blur': 8 }
     });
     map.current.addLayer({
       id: 'eco-route-line', type: 'line', source: 'eco-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#00FFA3', 'line-width': 5, 'line-opacity': 0.9 }
+      paint: { 'line-color': ecoColor, 'line-width': 8, 'line-opacity': 0.95 }
     });
 
     // Markers
-    const originEl = document.createElement('div');
-    originEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
-    markersRef.current.origin = new maplibregl.Marker({ element: originEl, anchor: 'center' });
+    if (!markersRef.current.origin) {
+      const originEl = document.createElement('div');
+      originEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
+      markersRef.current.origin = new maplibregl.Marker({ element: originEl, anchor: 'center' });
+    }
 
-    const destEl = document.createElement('div');
-    destEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#EF4444;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
-    markersRef.current.dest = new maplibregl.Marker({ element: destEl, anchor: 'center' });
+    if (!markersRef.current.dest) {
+      const destEl = document.createElement('div');
+      destEl.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#EF4444;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
+      markersRef.current.dest = new maplibregl.Marker({ element: destEl, anchor: 'center' });
+    }
   };
 
   // Sync theme
@@ -277,7 +294,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
   };
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative bg-[var(--surface)]">
       <div ref={mapContainer} className="w-full h-full absolute inset-0" />
       
       {isSearching && (

@@ -2,6 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import ApiKeyManager from '../../components/ApiKeyManager';
 import DashboardStats from '../../components/DashboardStats';
+import RouteHistory from '../../components/RouteHistory';
 
 export default async function DashboardPage() {
   const { userId } = await auth();
@@ -32,6 +33,11 @@ export default async function DashboardPage() {
         {/* Usage Analytics */}
         <div className="md:col-span-3 mt-2">
           <DashboardStats />
+        </div>
+
+        {/* History */}
+        <div className="md:col-span-3 mt-2">
+          <RouteHistory />
         </div>
       </div>
     </div>

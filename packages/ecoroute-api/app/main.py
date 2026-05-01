@@ -112,7 +112,7 @@ class RouteRequest(BaseModel):
     vehicle: str = "petrol"
 
 @app.post("/v1/routes", dependencies=[Depends(rate_limit)])
-def calculate_route(request: RouteRequest):
+def calculate_route(request: RouteRequest, api_key_data: dict = Depends(verify_api_key)):
     if not graph_store.graph:
         raise HTTPException(status_code=503, detail="Routing engine not initialized")
 
@@ -158,6 +158,27 @@ def calculate_route(request: RouteRequest):
         for r_type in ["greenest", "fastest", "shortest"]:
             if r_type in routes_data:
                 routes_data[r_type]["path_coords"] = hydrate_path(routes_data[r_type]["path"])
+
+        # 4. Save to database if user is authenticated
+        try:
+            db: Session = next(get_db())
+            from .models import SavedRoute
+            
+            new_saved = SavedRoute(
+                user_id=api_key_data["user_id"],
+                origin_lat=request.origin_lat,
+                origin_lon=request.origin_lon,
+                dest_lat=request.dest_lat,
+                dest_lon=request.dest_lon,
+                vehicle=request.vehicle,
+                green_co2=str(routes_data["greenest"]["co2_kg"]),
+                green_dist=str(routes_data["greenest"]["distance_km"]),
+                green_time=str(routes_data["greenest"]["time_min"])
+            )
+            db.add(new_saved)
+            db.commit()
+        except Exception as db_err:
+            print(f"⚠️ Failed to save route to history: {db_err}")
 
         return {
             "origin": {"lat": request.origin_lat, "lon": request.origin_lon, "node_id": start_node},
@@ -264,3 +285,10 @@ def revoke_api_key(key_id: str, user: UserSchema = Depends(get_current_user), db
     db.commit()
     
     return {"message": "API key revoked successfully"}
+
+@app.get("/internal/dashboard/history", dependencies=[Depends(get_current_user)])
+def list_history(user: UserSchema = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Lists the user's saved routing history."""
+    from .models import SavedRoute
+    history = db.query(SavedRoute).filter(SavedRoute.user_id == user.id).order_by(SavedRoute.created_at.desc()).limit(50).all()
+    return history

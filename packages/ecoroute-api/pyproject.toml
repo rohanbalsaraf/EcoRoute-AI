@@ -16,6 +16,8 @@ python-dotenv = "^1.0.1"
 alembic = "^1.18.4"
 passlib = "^1.7.4"
 bcrypt = "^5.0.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+svix = "^1.24.0"
 
 [build-system]
 requires = ["poetry-core"]

@@ -280,11 +280,11 @@ export default function ComparePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 h-[calc(100vh-5rem)]">
-      <div className="flex flex-col lg:flex-row gap-6 h-full">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 min-h-[calc(100vh-5rem)] lg:h-[calc(100vh-5rem)]">
+      <div className="flex flex-col lg:flex-row gap-6 h-full pb-8 lg:pb-0">
         
         {/* Left Control Panel */}
-        <div className="w-full lg:w-1/3 flex flex-col gap-4 h-full overflow-y-auto pr-2 pb-4">
+        <div className="w-full lg:w-1/3 flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-2">
           <div>
             <h1 className="text-2xl font-bold mb-1 text-white">API Playground</h1>
             <p className="text-[var(--text-secondary)] text-xs mb-4">
@@ -368,7 +368,7 @@ export default function ComparePage() {
         </div>
 
         {/* Right Map View */}
-        <div className="w-full lg:w-2/3 h-[400px] lg:h-full rounded-xl overflow-hidden glass-panel relative border border-[var(--border-subtle)]">
+        <div className="w-full lg:w-2/3 h-[300px] sm:h-[400px] lg:h-full rounded-xl overflow-hidden glass-panel relative border border-[var(--border-subtle)]">
           <MapView 
             isActive={!!results} 
             isSearching={isSearching} 

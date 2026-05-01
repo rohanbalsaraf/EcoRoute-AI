@@ -34,8 +34,24 @@ export default function DashboardStats() {
 
   if (loading) {
     return (
-      <div className="glass-panel p-6 rounded-lg border md:col-span-3 h-48 flex items-center justify-center">
-        <p className="text-[var(--text-secondary)]">Loading analytics...</p>
+      <div className="glass-panel p-4 md:col-span-3">
+        <div className="flex justify-between items-center mb-6">
+          <div className="h-6 w-32 skeleton"></div>
+          <div className="h-5 w-20 skeleton"></div>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="flex justify-between">
+            <div className="h-3 w-24 skeleton"></div>
+            <div className="h-3 w-16 skeleton"></div>
+          </div>
+          <div className="h-1.5 w-full skeleton"></div>
+        </div>
+        
+        <div className="mt-8 flex justify-between items-center border-t border-[var(--border-subtle)] pt-4">
+          <div className="h-8 w-28 skeleton rounded-md"></div>
+          <div className="h-4 w-24 skeleton"></div>
+        </div>
       </div>
     );
   }

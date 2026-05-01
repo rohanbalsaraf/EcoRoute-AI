@@ -102,6 +102,37 @@ async def startup_event():
 def read_root():
     return {"message": "Welcome to the EcoRoute API", "version": "1.0.0"}
 
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """System health check for monitoring."""
+    status = {
+        "status": "operational",
+        "timestamp": time.time(),
+        "services": {
+            "database": "connected",
+            "redis": "connected" if redis_client else "offline",
+            "routing_engine": "operational" if graph_store.graph else "initializing"
+        }
+    }
+    
+    # 1. Check DB
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+    except Exception:
+        status["services"]["database"] = "unreachable"
+        status["status"] = "degraded"
+        
+    # 2. Check Redis
+    if not redis_client:
+        status["status"] = "degraded"
+        
+    # 3. Check Engine
+    if not graph_store.graph:
+        status["status"] = "degraded"
+        
+    return status
+
 from pydantic import BaseModel
 
 class RouteRequest(BaseModel):

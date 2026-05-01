@@ -36,6 +36,7 @@ export default function Footer() {
             <li><Link href="/about" className="text-[var(--text-secondary)] hover:text-[var(--neon-green)] transition-colors">About Us</Link></li>
             <li><Link href="/contact" className="text-[var(--text-secondary)] hover:text-[var(--neon-green)] transition-colors">Contact</Link></li>
             <li><Link href="/changelog" className="text-[var(--text-secondary)] hover:text-[var(--neon-green)] transition-colors">Changelog</Link></li>
+            <li><Link href="/status" className="text-[var(--text-secondary)] hover:text-[var(--neon-green)] transition-colors">System Status</Link></li>
             <li><Link href="/privacy" className="text-[var(--text-secondary)] hover:text-[var(--neon-green)] transition-colors">Privacy Policy</Link></li>
             <li><Link href="/terms" className="text-[var(--text-secondary)] hover:text-[var(--neon-green)] transition-colors">Terms of Service</Link></li>
           </ul>

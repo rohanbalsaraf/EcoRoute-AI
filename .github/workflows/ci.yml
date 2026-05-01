@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    name: Linting
+    name: Linting (All Packages)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,21 +18,27 @@ jobs:
         with:
           python-version: '3.12'
           
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+          
+      - name: Lint Python (API & Agent)
+        run: |
+          uv run ruff check .
+          
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           
-      - name: Install Linting Tools
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Lint Web & SDK
         run: |
-          pip install flake8 black mypy
-          # Node linting usually comes with the package
-          
-      - name: Lint Python (API)
-        run: |
-          cd packages/ecoroute-api
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          pnpm install
+          pnpm run lint
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -43,10 +49,9 @@ jobs:
         run: |
           cd packages/ecoroute-core
           cargo fmt --all -- --check
-        continue-on-error: true
 
   rust-core:
-    name: Rust Core
+    name: Rust Core (Validation)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,15 +61,39 @@ jobs:
         run: |
           cd packages/ecoroute-core
           cargo check
-      - name: Cargo Test
+      - name: Cargo Test (Release Mode)
         run: |
           cd packages/ecoroute-core
-          cargo test
+          cargo test --release
 
   python-api:
-    name: Python API
+    name: Python API (Hardened)
     runs-on: ubuntu-latest
     needs: rust-core
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ecoroute
+          POSTGRES_PASSWORD: ecoroute_password
+          POSTGRES_DB: ecoroute_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
     steps:
       - uses: actions/checkout@v4
       
@@ -72,34 +101,41 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
           
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        
       - name: Set up Rust (for maturin)
         uses: actions-rust-lang/setup-rust-toolchain@v1
         
-      - name: Install dependencies
-        run: |
-          cd packages/ecoroute-api
-          pip install -r requirements.txt
-          pip install maturin pytest
-          
-      - name: Build & Install Rust Core
+      - name: Build Rust Core (Production Build)
         run: |
           cd packages/ecoroute-core
-          maturin develop
+          uv pip install maturin
+          maturin build --release --out dist
+          uv pip install dist/*.whl
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
           
-      - name: Run Tests
+      - name: Install API Dependencies
+        run: |
+          cd packages/ecoroute-api
+          uv pip install -e .
+          uv pip install pytest pytest-asyncio httpx
+          
+      - name: Run Integration Tests
         run: |
           cd packages/ecoroute-api
           pytest
         env:
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: postgresql://ecoroute:ecoroute_password@localhost:5432/ecoroute_test
           REDIS_URL: redis://localhost:6379/0
           CLERK_SECRET_KEY: test_secret
           LEMONSQUEEZY_WEBHOOK_SECRET: test_secret
+          SENTRY_DSN: ""
 
   web-frontend:
-    name: Web Frontend
+    name: Web Frontend & E2E
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -108,43 +144,64 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'packages/ecoroute-web/package-lock.json'
           
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
       - name: Install dependencies
-        run: |
-          cd packages/ecoroute-web
-          npm install
+        run: pnpm install
           
-      - name: Build Check
-        run: |
-          cd packages/ecoroute-web
-          npm run build
+      - name: Build Web
+        run: pnpm --filter ecoroute-web run build
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: test_key
           CLERK_SECRET_KEY: test_secret
           NEXT_PUBLIC_API_URL: http://localhost:8000
+          
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        
+      - name: Run E2E Smoke Test
+        run: pnpm --filter ecoroute-web run test:e2e
+        continue-on-error: true # Allow failure until full E2E suite is stable
 
-  ts-sdk:
-    name: TS SDK
+  ecoroute-agent:
+    name: AI Agent (Validation)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install Dependencies
+        run: |
+          cd packages/ecoroute-agent
+          uv pip install .
+      - name: Agent Check
+        run: |
+          cd packages/ecoroute-agent
+          # Add agent-specific validation (e.g., ruff, pytest)
+          uv run ruff check .
+
+  mobile-check:
+    name: Mobile (Expo) Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'packages/ecoroute-sdk-ts/package-lock.json'
-          
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
       - name: Install dependencies
-        run: |
-          cd packages/ecoroute-sdk-ts
-          npm install
-          
-      - name: Build & Test
-        run: |
-          cd packages/ecoroute-sdk-ts
-          npm run build
-          # npm test # Enable if tests are configured in package.json
+        run: pnpm install
+      - name: Expo Lint
+        run: pnpm --filter ecoroute-mobile run lint

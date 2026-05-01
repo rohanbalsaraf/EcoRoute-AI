@@ -33,19 +33,83 @@ interface RawRouteData {
   standard: RouteGeometry;
 }
 
+// Decode Google-style encoded polyline (used by Valhalla)
+function decodePolyline(encoded: string): [number, number][] {
+  const coords: [number, number][] = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let shift = 0, result = 0, byte: number;
+    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    shift = 0; result = 0;
+    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    coords.push([lng / 1e6, lat / 1e6]); // [lon, lat] for GeoJSON
+  }
+  return coords;
+}
+
+// Primary: Valhalla (reliable, free, hosted by OSM DE)
+async function fetchValhallaRoute(
+  originLat: number, originLon: number,
+  destLat: number, destLon: number
+): Promise<RouteGeometry[]> {
+  const body = JSON.stringify({
+    locations: [
+      { lat: originLat, lon: originLon },
+      { lat: destLat, lon: destLon }
+    ],
+    costing: "auto",
+    alternates: 2,
+    units: "kilometers"
+  });
+
+  const res = await fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(body)}`, {
+    signal: AbortSignal.timeout(20000)
+  });
+
+  if (!res.ok) throw new Error(`Routing service error (${res.status})`);
+  const data = await res.json();
+  
+  if (!data.trip?.legs?.length) {
+    throw new Error('Could not find a driving route between these locations.');
+  }
+
+  // Primary route
+  const routes: RouteGeometry[] = [];
+  const primaryShape = data.trip.legs[0].shape;
+  routes.push({
+    coordinates: decodePolyline(primaryShape),
+    distance_km: data.trip.summary.length,
+    duration_min: data.trip.summary.time / 60,
+  });
+
+  // Check for alternates
+  if (data.alternates?.length) {
+    for (const alt of data.alternates) {
+      if (alt.trip?.legs?.[0]?.shape) {
+        routes.push({
+          coordinates: decodePolyline(alt.trip.legs[0].shape),
+          distance_km: alt.trip.summary.length,
+          duration_min: alt.trip.summary.time / 60,
+        });
+      }
+    }
+  }
+
+  return routes;
+}
+
+// Fallback: OSRM
 async function fetchOSRMRoute(
   originLat: number, originLon: number,
   destLat: number, destLon: number
 ): Promise<RouteGeometry[]> {
   const url = `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&alternatives=true`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`Routing service error (${res.status}). Please try again.`);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`OSRM error (${res.status})`);
   const data = await res.json();
-
-  if (data.code !== 'Ok' || !data.routes?.length) {
-    throw new Error('Could not find a driving route between these locations.');
-  }
-
+  if (data.code !== 'Ok' || !data.routes?.length) throw new Error('OSRM: no route found');
   return data.routes.map((r: any) => ({
     coordinates: r.geometry.coordinates,
     distance_km: r.distance / 1000,
@@ -53,27 +117,19 @@ async function fetchOSRMRoute(
   }));
 }
 
-async function fetchDetourRoute(
+// Multi-provider route fetcher with fallback
+async function fetchRoute(
   originLat: number, originLon: number,
   destLat: number, destLon: number
-): Promise<RouteGeometry | null> {
+): Promise<RouteGeometry[]> {
+  // Try Valhalla first (most reliable)
   try {
-    const midLat = (originLat + destLat) / 2 + 0.03;
-    const midLon = (originLon + destLon) / 2 + 0.03;
-    const url = `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${midLon},${midLat};${destLon},${destLat}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.code === 'Ok' && data.routes?.length) {
-      return {
-        coordinates: data.routes[0].geometry.coordinates,
-        distance_km: data.routes[0].distance / 1000,
-        duration_min: data.routes[0].duration / 60,
-      };
-    }
+    return await fetchValhallaRoute(originLat, originLon, destLat, destLon);
   } catch (e) {
-    console.warn("Detour fetch failed:", e);
+    console.warn('Valhalla failed, trying OSRM:', e);
   }
-  return null;
+  // Fallback to OSRM
+  return await fetchOSRMRoute(originLat, originLon, destLat, destLon);
 }
 
 export default function ComparePage() {
@@ -140,16 +196,31 @@ export default function ComparePage() {
     setSelectedRoute("eco");
     
     try {
-      // 1. Geocode locations via Nominatim
+      // 1. Geocode — try Photon first (more reliable), fallback to Nominatim
       const geocode = async (query: string) => {
+        // Try Photon (Komoot) first
+        try {
+          const res = await fetch(
+            `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`,
+            { signal: AbortSignal.timeout(8000) }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.features?.length > 0) {
+              const [lon, lat] = data.features[0].geometry.coordinates;
+              return { lat, lon };
+            }
+          }
+        } catch (e) {
+          console.warn('Photon geocoder failed, trying Nominatim:', e);
+        }
+
+        // Fallback to Nominatim
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
-          { 
-            headers: { 'Accept': 'application/json' },
-            signal: AbortSignal.timeout(10000)
-          }
+          { signal: AbortSignal.timeout(8000) }
         );
-        if (!res.ok) throw new Error(`Geocoding service error (${res.status}). Please try again.`);
+        if (!res.ok) throw new Error(`Geocoding failed (${res.status}). Try again.`);
         const data = await res.json();
         if (data.length === 0) throw new Error(`Location not found: "${query}". Try a more specific name.`);
         return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
@@ -159,18 +230,16 @@ export default function ComparePage() {
       setOriginCoords(origin);
       setDestCoords(dest);
 
-      // 2. Get routes from OSRM
-      const osrmRoutes = await fetchOSRMRoute(origin.lat, origin.lon, dest.lat, dest.lon);
-      const primaryRoute = osrmRoutes[0];
+      // 2. Get routes (Valhalla → OSRM fallback)
+      const routes = await fetchRoute(origin.lat, origin.lon, dest.lat, dest.lon);
+      const primaryRoute = routes[0];
+      let altRoute = routes.length > 1 ? routes[1] : null;
       
-      // Always get a distinct second route
-      let altRoute: RouteGeometry | null = osrmRoutes.length > 1 ? osrmRoutes[1] : null;
       if (!altRoute) {
-        altRoute = await fetchDetourRoute(origin.lat, origin.lon, dest.lat, dest.lon);
-      }
-      if (!altRoute) {
+        // Fake a slightly longer route for comparison
         altRoute = {
           ...primaryRoute,
+          coordinates: [...primaryRoute.coordinates],
           distance_km: primaryRoute.distance_km * 1.15,
           duration_min: primaryRoute.duration_min * 1.10,
         };

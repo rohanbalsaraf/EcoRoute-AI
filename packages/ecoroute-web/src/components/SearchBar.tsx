@@ -51,13 +51,18 @@ function AutocompleteInput({
     setIsFetching(true);
 
     fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(debouncedValue)}&limit=5&addressdetails=1`,
-      { signal: controller.signal, headers: { 'Accept-Language': 'en' } }
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(debouncedValue)}&limit=5`,
+      { signal: controller.signal }
     )
       .then(res => res.json())
       .then(data => {
-        setSuggestions(data);
-        setShowDropdown(data.length > 0);
+        const results = (data.features || []).map((f: any) => ({
+          display_name: [f.properties.name, f.properties.county, f.properties.state, f.properties.country].filter(Boolean).join(', '),
+          lat: String(f.geometry.coordinates[1]),
+          lon: String(f.geometry.coordinates[0]),
+        }));
+        setSuggestions(results);
+        setShowDropdown(results.length > 0);
         setIsFetching(false);
       })
       .catch(() => setIsFetching(false));
@@ -139,9 +144,14 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
         const { latitude, longitude } = position.coords;
         // Reverse geocode to get readable address
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const res = await fetch(`https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}`);
           const data = await res.json();
-          setOrigin(data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          if (data.features?.length > 0) {
+            const p = data.features[0].properties;
+            setOrigin([p.name, p.city || p.county, p.state, p.country].filter(Boolean).join(', '));
+          } else {
+            setOrigin(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          }
         } catch {
           setOrigin(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         }

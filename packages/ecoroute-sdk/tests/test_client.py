@@ -1,6 +1,5 @@
-import pytest
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from ecoroute.client import EcoRouteClient
 from ecoroute.models import Coordinate, Waypoint
 

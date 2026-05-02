@@ -1,5 +1,4 @@
-import pytest
-from ecoroute.optimizer import Optimizer, PyNode, PyEdge, _carbon_cost, _calculate_metrics
+from ecoroute.optimizer import PyEdge, _carbon_cost, _calculate_metrics
 from ecoroute.models import VehicleType
 
 def test_carbon_cost_alignment():

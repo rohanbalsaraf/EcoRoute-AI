@@ -63,7 +63,7 @@ async def clerk_webhook(
 
     return {"status": "success"}
 
-LEMON_SQUEEZY_WEBHOOK_SECRET = os.getenv("LEMONSQUEEZY_WEBHOOK_SECRET")
+LEMON_SQUEEZY_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "your_secret_here")
 
 @router.post("/lemonsqueezy")
 async def lemonsqueezy_webhook(

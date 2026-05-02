@@ -1,6 +1,6 @@
 import pytest
 from app.database import engine, Base
-from app.models import User, Subscription, APIKey, SavedRoute
+from app.models import User, Subscription, APIKey, SavedRoute  # noqa: F401
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():

@@ -35,7 +35,7 @@ const tokenCache = {
   },
 };
 
-const CLERK_PUBLISHABLE_KEY = "pk_test_ZWNvcm91dGUtY2xlcmstbW9jay1rZXktest";
+const CLERK_PUBLISHABLE_KEY = "pk_test_bGlrZWQtbWFuYXRlZS01NS5jbGVyay5hY2NvdW50cy5kZXYk";
 
 const { width } = Dimensions.get('window');
 
@@ -366,12 +366,13 @@ function MainApp() {
                   </View>
                 </View>
               )}
+              <View style={{ height: 100 }} />
             </ScrollView>
           </>
         )}
 
         {activeTab === 'dashboard' && (
-          <View style={styles.tabContent}>
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.tabContent}>
             <Text style={styles.tabTitle}>Eco Dashboard</Text>
             <View style={styles.statCardLarge}>
               <Activity size={32} color="#00FFA3" />
@@ -397,11 +398,12 @@ function MainApp() {
                 <Text style={styles.historySaving}>-2.4kg</Text>
               </View>
             </View>
-          </View>
+            <View style={{ height: 100 }} />
+          </ScrollView>
         )}
 
         {activeTab === 'profile' && (
-          <View style={styles.tabContent}>
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.tabContent}>
             <Text style={styles.tabTitle}>Account</Text>
             <View style={styles.profileSection}>
               <View style={styles.avatarLarge}>
@@ -422,11 +424,10 @@ function MainApp() {
                 <Text style={styles.authButtonTextOutline}>Sign Out</Text>
               </TouchableOpacity>
             </SignedIn>
-          </View>
+            <View style={{ height: 100 }} />
+          </ScrollView>
         )}
 
-        <View style={{ height: 100 }} />
-        </ScrollView>
 
         {/* Bottom Nav */}
         <View style={styles.bottomNav}>

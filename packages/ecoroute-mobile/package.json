@@ -9,21 +9,23 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@clerk/clerk-expo": "^1.1.0",
+    "@clerk/clerk-js": "^6.8.0",
+    "@clerk/clerk-react": "^5.61.3",
     "expo": "~54.0.33",
+    "expo-asset": "~12.0.13",
+    "expo-auth-session": "^7.0.11",
+    "expo-constants": "~18.0.13",
+    "expo-linear-gradient": "~15.0.8",
+    "expo-secure-store": "^15.0.8",
     "expo-status-bar": "~3.0.9",
+    "expo-web-browser": "^15.0.11",
+    "lucide-react-native": "^0.378.0",
     "react": "19.1.0",
     "react-native": "0.81.5",
-    "expo-linear-gradient": "~15.0.8",
-    "lucide-react-native": "^0.378.0",
-    "react-native-svg": "15.12.1",
-    "expo-asset": "~12.0.13",
-    "expo-constants": "~18.0.13",
-    "react-native-safe-area-context": "~5.6.0",
     "react-native-maps": "1.18.0",
-    "@clerk/clerk-expo": "^1.1.0",
-    "expo-secure-store": "*",
-    "expo-auth-session": "*",
-    "expo-web-browser": "*"
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-svg": "15.12.1"
   },
   "private": true
 }

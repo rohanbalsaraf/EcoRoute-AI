@@ -12,7 +12,7 @@
 from __future__ import annotations
 import asyncio
 import math
-from typing import Optional
+from typing import Optional, Union, List, Dict
 import os
 import httpx
 from .models import (
@@ -79,57 +79,71 @@ class EcoRouteClient:
         """
         Find greenest, fastest, and shortest routes between two points.
         """
-        results = await self.find_routes_bulk(origin, destination, [vehicle])
-        return results[0] if results else None
+        v = VehicleType(vehicle.lower()) if isinstance(vehicle, str) else vehicle
+        results = await self.find_routes_bulk(origin, destination, [v])
+        return results.get(v) if results else None
 
     async def find_routes_bulk(
         self,
-        origin: str | Coordinate,
-        destination: str | Coordinate,
-        vehicles: list[str | VehicleType],
-    ) -> list[RouteResponse]:
+        origin: Union[str, Coordinate],
+        destination: Union[str, Coordinate],
+        vehicles: List[VehicleType]
+    ) -> Dict[VehicleType, RouteResponse]:
         """
-        Find routes for multiple vehicles efficiently by reusing geocoding and graph building.
+        Optimized bulk routing for multiple vehicles.
+        In remote mode, uses the /v1/routes/compare endpoint to minimize network calls.
         """
-        if not vehicles:
-            return []
-
-        # Resolve vehicles
-        resolved_vehicles = [
-            VehicleType(v.lower()) if isinstance(v, str) else v for v in vehicles
-        ]
-
         # Resolve coordinates (uses cache)
         origin_wp = await self._resolve_location(origin)
         dest_wp = await self._resolve_location(destination)
 
         if origin_wp is None or dest_wp is None:
-            return []
+            return {}
 
         # OPTION A: Call Remote EcoRoute API (Production Mode)
         if self.api_url:
-            # For now, call in a loop or add a bulk endpoint to the API
-            # Ideally we add a bulk endpoint to the API to avoid multiple network calls
-            tasks = [
-                self._fetch_remote_routes(origin_wp, dest_wp, v)
-                for v in resolved_vehicles
-            ]
-            results = await asyncio.gather(*tasks)
-            return [r for r in results if r is not None]
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                payload = {
+                    "origin_lat": origin_wp.coordinate.lat,
+                    "origin_lon": origin_wp.coordinate.lon,
+                    "dest_lat": dest_wp.coordinate.lat,
+                    "dest_lon": dest_wp.coordinate.lon,
+                    "vehicles": [v.value for v in vehicles]
+                }
+                response = await client.post(
+                    f"{self.api_url}/v1/routes/compare",
+                    json=payload
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    results = {}
+                    for v_str, res in data["comparisons"].items():
+                        v_type = VehicleType(v_str)
+                        if "error" in res: continue
+                        
+                        results[v_type] = RouteResponse(
+                            origin=origin_wp,
+                            destination=dest_wp,
+                            vehicle=v_type,
+                            greenest=res["greenest"],
+                            fastest=res["fastest"],
+                            shortest=res["shortest"]
+                        )
+                    return results
+                return {}
 
         # OPTION B: Build Local Graph from OSRM (SDK Mode)
-        # We build the graph ONCE and then run optimizer for each vehicle
         nodes, adjacency = await self._build_real_graph(
             origin_wp.coordinate,
             dest_wp.coordinate,
-            resolved_vehicles,
+            vehicles,
         )
 
         if not nodes:
-            return []
+            return {}
 
-        final_results = []
-        for v in resolved_vehicles:
+        final_results = {}
+        for v in vehicles:
             res = self._optimizer.find_routes(
                 nodes=nodes,
                 adjacency=adjacency,
@@ -140,7 +154,7 @@ class EcoRouteClient:
                 dest_wp=dest_wp,
             )
             if res:
-                final_results.append(res)
+                final_results[v] = res
 
         return final_results
 

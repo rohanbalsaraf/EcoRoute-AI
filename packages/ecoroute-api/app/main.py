@@ -139,12 +139,21 @@ def health_check(db: Session = Depends(get_db)):
 
 from pydantic import BaseModel  # noqa: E402
 
+from typing import List, Dict
+
 class RouteRequest(BaseModel):
     origin_lat: float
     origin_lon: float
     dest_lat: float
     dest_lon: float
     vehicle: str = "petrol"
+
+class BulkRouteRequest(BaseModel):
+    origin_lat: float
+    origin_lon: float
+    dest_lat: float
+    dest_lon: float
+    vehicles: List[str]
 
 @app.post("/v1/routes", dependencies=[Depends(rate_limit)])
 def calculate_route(request: RouteRequest, api_key_data: dict = Depends(verify_api_key)):
@@ -241,6 +250,66 @@ def calculate_route(request: RouteRequest, api_key_data: dict = Depends(verify_a
             "destination": {"lat": request.dest_lat, "lon": request.dest_lon, "node_id": end_node},
             "vehicle": request.vehicle,
             "routes": routes_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/v1/routes/compare", dependencies=[Depends(rate_limit)])
+def compare_routes(request: BulkRouteRequest, api_key_data: dict = Depends(verify_api_key)):
+    if not graph_store.graph:
+        raise HTTPException(status_code=503, detail="Routing engine not initialized")
+
+    try:
+        # 1. On-demand ingestion (same as single route)
+        start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
+        end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
+        
+        lat_start, lon_start = graph_store.graph.get_node_coords(start_node)
+        lat_end, lon_end = graph_store.graph.get_node_coords(end_node)
+        
+        dist_sq_origin = (lat_start - request.origin_lat)**2 + (lon_start - request.origin_lon)**2
+        dist_sq_dest = (lat_end - request.dest_lat)**2 + (lon_end - request.dest_lon)**2
+        
+        if dist_sq_origin > 0.02 or dist_sq_dest > 0.02:
+            graph_store.update_graph_for_area(
+                request.origin_lat, request.origin_lon,
+                request.dest_lat, request.dest_lon
+            )
+            # Re-snap after update
+            start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
+            end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
+
+        import ecoroute_core
+        results = {}
+        
+        # 2. Iterate through vehicles
+        for vehicle in request.vehicles:
+            try:
+                routes = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, vehicle)
+                
+                def format_route(route_obj, label, opt_for):
+                    return {
+                        "label": label,
+                        "optimize_for": opt_for,
+                        "path_node_ids": route_obj.path,
+                        "total_carbon_kg": route_obj.total_carbon_kg,
+                        "total_distance_km": route_obj.total_distance_km,
+                        "total_time_min": route_obj.total_time_min,
+                        "vehicle": vehicle
+                    }
+
+                results[vehicle] = {
+                    "greenest": format_route(routes.greenest, "Greenest", "carbon"),
+                    "fastest": format_route(routes.fastest, "Fastest", "time"),
+                    "shortest": format_route(routes.shortest, "Shortest", "distance")
+                }
+            except Exception as ve:
+                results[vehicle] = {"error": str(ve)}
+
+        return {
+            "origin": {"lat": request.origin_lat, "lon": request.origin_lon},
+            "destination": {"lat": request.dest_lat, "lon": request.dest_lon},
+            "comparisons": results
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

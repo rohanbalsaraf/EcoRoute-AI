@@ -15,6 +15,27 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Leaf, Navigation, Zap, Bike, Fuel, Activity, Clock, Map as MapIcon, Search, ArrowRight, Gauge } from 'lucide-react-native';
 import MapView, { Polyline, Marker } from 'react-native-maps';
+import * as SecureStore from 'expo-secure-store';
+import { ClerkProvider, SignedIn, SignedOut, useAuth, useUser } from '@clerk/clerk-expo';
+
+const tokenCache = {
+  async getToken(key) {
+    try {
+      return SecureStore.getItemAsync(key);
+    } catch (err) {
+      return null;
+    }
+  },
+  async saveToken(key, value) {
+    try {
+      return SecureStore.setItemAsync(key, value);
+    } catch (err) {
+      return;
+    }
+  },
+};
+
+const CLERK_PUBLISHABLE_KEY = "pk_test_ZWNvcm91dGUtY2xlcmstbW9jay1rZXktest";
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +69,20 @@ function decodePolyline(encoded) {
 }
 
 export default function App() {
+  return (
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
+      <MainApp />
+    </ClerkProvider>
+  );
+}
+
+function MainApp() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const [activeTab, setActiveTab] = useState('map'); // 'map' | 'dashboard' | 'profile'
+  const [stats, setStats] = useState({ saved_co2: "0.0", api_calls: 0, tier: "Free" });
+
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -56,6 +91,31 @@ export default function App() {
   const [destCoords, setDestCoords] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState('ev');
   const [selectedRouteType, setSelectedRouteType] = useState('eco'); // 'eco' | 'standard'
+
+  // Fetch real stats from API
+  useEffect(() => {
+    if (isSignedIn && activeTab === 'dashboard') {
+      const fetchStats = async () => {
+        try {
+          const token = await getToken();
+          const response = await fetch('https://eco-route-api.render.com/internal/dashboard/stats', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setStats({
+              saved_co2: (data.api_calls_this_month * 0.45).toFixed(1), // Mock formula for saved kg
+              api_calls: data.api_calls_this_month,
+              tier: data.tier
+            });
+          }
+        } catch (err) {
+          console.error("Stats fetch failed:", err);
+        }
+      };
+      fetchStats();
+    }
+  }, [isSignedIn, activeTab]);
 
   // Reactive Results Calculation
   const results = useMemo(() => {
@@ -156,163 +216,238 @@ export default function App() {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
       
-        {/* Search Header */}
-        <View style={styles.searchSection}>
-          <Text style={styles.title}>EcoRoute Planner</Text>
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <Search size={16} color="#64748b" style={styles.inputIcon} />
-              <TextInput 
-                style={styles.input}
-                placeholder="Starting Point..."
-                placeholderTextColor="#64748b"
-                value={origin}
-                onChangeText={setOrigin}
-              />
+        {activeTab === 'map' && (
+          <>
+            {/* Search Header */}
+            <View style={styles.searchSection}>
+              <Text style={styles.title}>EcoRoute Planner</Text>
+              <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <Search size={16} color="#64748b" style={styles.inputIcon} />
+                  <TextInput 
+                    style={styles.input}
+                    placeholder="Starting Point..."
+                    placeholderTextColor="#64748b"
+                    value={origin}
+                    onChangeText={setOrigin}
+                  />
+                </View>
+                <View style={styles.inputWrapper}>
+                  <MapIcon size={16} color="#64748b" style={styles.inputIcon} />
+                  <TextInput 
+                    style={styles.input}
+                    placeholder="Destination..."
+                    placeholderTextColor="#64748b"
+                    value={destination}
+                    onChangeText={setDestination}
+                  />
+                </View>
+                <TouchableOpacity 
+                  style={styles.searchButton}
+                  onPress={handleSearch}
+                  disabled={isSearching}
+                >
+                  <LinearGradient
+                    colors={['#00FFA3', '#00D187']}
+                    style={styles.gradientSearch}
+                  >
+                    {isSearching ? <ActivityIndicator color="#000" size="small" /> : <ArrowRight size={20} color="#000" />}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.inputWrapper}>
-              <MapIcon size={16} color="#64748b" style={styles.inputIcon} />
-              <TextInput 
-                style={styles.input}
-                placeholder="Destination..."
-                placeholderTextColor="#64748b"
-                value={destination}
-                onChangeText={setDestination}
-              />
-            </View>
-            <TouchableOpacity 
-              style={styles.searchButton}
-              onPress={handleSearch}
-              disabled={isSearching}
-            >
-              <LinearGradient
-                colors={['#00FFA3', '#00D187']}
-                style={styles.gradientSearch}
-              >
-                {isSearching ? <ActivityIndicator color="#000" size="small" /> : <ArrowRight size={20} color="#000" />}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Interactive Map */}
-          <View style={styles.mapContainer}>
-            <View style={styles.mapFrame}>
-              <MapView
-                style={styles.map}
-                initialRegion={{
-                  latitude: 18.52,
-                  longitude: 73.85,
-                  latitudeDelta: 0.1,
-                  longitudeDelta: 0.1,
-                }}
-                region={originCoords ? {
-                  latitude: (originCoords.lat + destCoords.lat) / 2,
-                  longitude: (originCoords.lon + destCoords.lon) / 2,
-                  latitudeDelta: Math.abs(originCoords.lat - destCoords.lat) * 2,
-                  longitudeDelta: Math.abs(originCoords.lon - destCoords.lon) * 2,
-                } : undefined}
-                customMapStyle={darkMapStyle}
-              >
-                {rawRoutes && (
-                  <>
-                    <Polyline 
-                      coordinates={rawRoutes.standard.coordinates}
-                      strokeWidth={4}
-                      strokeColor="rgba(255, 255, 255, 0.2)"
-                      lineDashPattern={[5, 5]}
-                    />
-                    <Polyline 
-                      coordinates={rawRoutes.eco.coordinates}
-                      strokeWidth={6}
-                      strokeColor="#00FFA3"
-                    />
-                    <Marker coordinate={{ latitude: originCoords.lat, longitude: originCoords.lon }}>
-                      <View style={styles.markerOrigin} />
-                    </Marker>
-                    <Marker coordinate={{ latitude: destCoords.lat, longitude: destCoords.lon }}>
-                      <View style={styles.markerDest} />
-                    </Marker>
-                  </>
-                )}
-              </MapView>
-              {!rawRoutes && !isSearching && (
-                <View style={styles.mapPlaceholder}>
-                  <Navigation size={40} color="rgba(0, 255, 163, 0.1)" />
-                  <Text style={styles.placeholderText}>Plan your first eco-trip</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Interactive Map */}
+              <View style={styles.mapContainer}>
+                <View style={styles.mapFrame}>
+                  <MapView
+                    style={styles.map}
+                    initialRegion={{
+                      latitude: 18.52,
+                      longitude: 73.85,
+                      latitudeDelta: 0.1,
+                      longitudeDelta: 0.1,
+                    }}
+                    region={originCoords ? {
+                      latitude: (originCoords.lat + destCoords.lat) / 2,
+                      longitude: (originCoords.lon + destCoords.lon) / 2,
+                      latitudeDelta: Math.abs(originCoords.lat - destCoords.lat) * 2,
+                      longitudeDelta: Math.abs(originCoords.lon - destCoords.lon) * 2,
+                    } : undefined}
+                    customMapStyle={darkMapStyle}
+                  >
+                    {rawRoutes && (
+                      <>
+                        <Polyline 
+                          coordinates={rawRoutes.standard.coordinates}
+                          strokeWidth={4}
+                          strokeColor="rgba(255, 255, 255, 0.2)"
+                          lineDashPattern={[5, 5]}
+                        />
+                        <Polyline 
+                          coordinates={rawRoutes.eco.coordinates}
+                          strokeWidth={6}
+                          strokeColor="#00FFA3"
+                        />
+                        <Marker coordinate={{ latitude: originCoords.lat, longitude: originCoords.lon }}>
+                          <View style={styles.markerOrigin} />
+                        </Marker>
+                        <Marker coordinate={{ latitude: destCoords.lat, longitude: destCoords.lon }}>
+                          <View style={styles.markerDest} />
+                        </Marker>
+                      </>
+                    )}
+                  </MapView>
+                  {!rawRoutes && !isSearching && (
+                    <View style={styles.mapPlaceholder}>
+                      <Navigation size={40} color="rgba(0, 255, 163, 0.1)" />
+                      <Text style={styles.placeholderText}>Plan your first eco-trip</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Vehicle Selection */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Select Vehicle</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehicleScroll}>
+                  {VEHICLES.map((v) => {
+                    const IconComponent = v.icon;
+                    return (
+                      <TouchableOpacity
+                        key={v.id}
+                        onPress={() => setSelectedVehicle(v.id)}
+                        style={[
+                          styles.vehicleCard,
+                          selectedVehicle === v.id && { borderColor: v.color, backgroundColor: 'rgba(0,255,163,0.05)' }
+                        ]}
+                      >
+                        <IconComponent size={24} color={selectedVehicle === v.id ? v.color : '#64748b'} />
+                        <Text style={[styles.vehicleLabel, selectedVehicle === v.id && { color: v.color }]}>{v.label}</Text>
+                        <Text style={styles.vehicleSaving}>-{((v.ecoSaving || 0) * 100).toFixed(0)}% CO₂</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Results Analysis */}
+              {results && (
+                <View style={styles.resultsContainer}>
+                  <View style={styles.savingsCard}>
+                    <LinearGradient
+                      colors={['rgba(0,255,163,0.1)', 'transparent']}
+                      style={styles.savingsGradient}
+                    >
+                      <Gauge size={20} color="#00FFA3" />
+                      <Text style={styles.savingsText}>{results.savings}</Text>
+                    </LinearGradient>
+                  </View>
+
+                  <View style={styles.routeSelector}>
+                    <TouchableOpacity 
+                      onPress={() => setSelectedRouteType('eco')}
+                      style={[styles.routeOption, selectedRouteType === 'eco' && styles.routeOptionActive]}
+                    >
+                      <Text style={styles.routeLabel}>Eco Route</Text>
+                      <Text style={styles.routeValue}>{results.eco.carbon}</Text>
+                      <Text style={styles.routeSub}>{results.eco.distance} • {results.eco.duration}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      onPress={() => setSelectedRouteType('standard')}
+                      style={[styles.routeOption, selectedRouteType === 'standard' && styles.routeOptionActiveStd]}
+                    >
+                      <Text style={styles.routeLabel}>Standard</Text>
+                      <Text style={styles.routeValue}>{results.standard.carbon}</Text>
+                      <Text style={styles.routeSub}>{results.standard.distance} • {results.standard.duration}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
-            </View>
-          </View>
-
-          {/* Vehicle Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select Vehicle</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehicleScroll}>
-              {VEHICLES.map((v) => {
-                const IconComponent = v.icon;
-                return (
-                  <TouchableOpacity
-                    key={v.id}
-                    onPress={() => setSelectedVehicle(v.id)}
-                    style={[
-                      styles.vehicleCard,
-                      selectedVehicle === v.id && { borderColor: v.color, backgroundColor: 'rgba(0,255,163,0.05)' }
-                    ]}
-                  >
-                    <IconComponent size={24} color={selectedVehicle === v.id ? v.color : '#64748b'} />
-                    <Text style={[styles.vehicleLabel, selectedVehicle === v.id && { color: v.color }]}>{v.label}</Text>
-                    <Text style={styles.vehicleSaving}>-{((v.ecoSaving || 0) * 100).toFixed(0)}% CO₂</Text>
-                  </TouchableOpacity>
-                );
-              })}
             </ScrollView>
-          </View>
+          </>
+        )}
 
-          {/* Results Analysis */}
-          {results && (
-            <View style={styles.resultsContainer}>
-              <View style={styles.savingsCard}>
-                <LinearGradient
-                  colors={['rgba(0,255,163,0.1)', 'transparent']}
-                  style={styles.savingsGradient}
-                >
-                  <Gauge size={20} color="#00FFA3" />
-                  <Text style={styles.savingsText}>{results.savings}</Text>
-                </LinearGradient>
+        {activeTab === 'dashboard' && (
+          <View style={styles.tabContent}>
+            <Text style={styles.tabTitle}>Eco Dashboard</Text>
+            <View style={styles.statCardLarge}>
+              <Activity size={32} color="#00FFA3" />
+              <Text style={styles.statLargeValue}>{stats.saved_co2} kg</Text>
+              <Text style={styles.statLargeLabel}>Total CO2 Saved</Text>
+              <View style={styles.divider} />
+              <Text style={styles.statSubText}>{stats.api_calls} API Calls • {stats.tier} Tier</Text>
+            </View>
+            <View style={styles.historySection}>
+              <Text style={styles.sectionTitle}>Recent Journeys</Text>
+              <View style={styles.historyItem}>
+                <View style={styles.historyInfo}>
+                  <Text style={styles.historyRoute}>Home → Office</Text>
+                  <Text style={styles.historyDate}>Today, 9:15 AM</Text>
+                </View>
+                <Text style={styles.historySaving}>-0.8kg</Text>
               </View>
-
-              <View style={styles.routeSelector}>
-                <TouchableOpacity 
-                  onPress={() => setSelectedRouteType('eco')}
-                  style={[styles.routeOption, selectedRouteType === 'eco' && styles.routeOptionActive]}
-                >
-                  <Text style={styles.routeLabel}>Eco Route</Text>
-                  <Text style={styles.routeValue}>{results.eco.carbon}</Text>
-                  <Text style={styles.routeSub}>{results.eco.distance} • {results.eco.duration}</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  onPress={() => setSelectedRouteType('standard')}
-                  style={[styles.routeOption, selectedRouteType === 'standard' && styles.routeOptionActiveStd]}
-                >
-                  <Text style={styles.routeLabel}>Standard</Text>
-                  <Text style={styles.routeValue}>{results.standard.carbon}</Text>
-                  <Text style={styles.routeSub}>{results.standard.distance} • {results.standard.duration}</Text>
-                </TouchableOpacity>
+              <View style={styles.historyItem}>
+                <View style={styles.historyInfo}>
+                  <Text style={styles.historyRoute}>Airport → City Center</Text>
+                  <Text style={styles.historyDate}>Yesterday, 6:30 PM</Text>
+                </View>
+                <Text style={styles.historySaving}>-2.4kg</Text>
               </View>
             </View>
-          )}
+          </View>
+        )}
 
-          <View style={{ height: 100 }} />
+        {activeTab === 'profile' && (
+          <View style={styles.tabContent}>
+            <Text style={styles.tabTitle}>Account</Text>
+            <View style={styles.profileSection}>
+              <View style={styles.avatarLarge}>
+                <Leaf size={40} color="#00FFA3" />
+              </View>
+              <Text style={styles.profileName}>{user?.firstName || 'Guest User'}</Text>
+              <Text style={styles.profileEmail}>{user?.emailAddresses[0]?.emailAddress || 'Not signed in'}</Text>
+            </View>
+            
+            <SignedOut>
+              <TouchableOpacity style={styles.authButton}>
+                <Text style={styles.authButtonText}>Sign In to Sync History</Text>
+              </TouchableOpacity>
+            </SignedOut>
+            
+            <SignedIn>
+              <TouchableOpacity style={styles.authButtonOutline}>
+                <Text style={styles.authButtonTextOutline}>Sign Out</Text>
+              </TouchableOpacity>
+            </SignedIn>
+          </View>
+        )}
+
+        <View style={{ height: 100 }} />
         </ScrollView>
 
         {/* Bottom Nav */}
         <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem}><MapIcon size={24} color="#00FFA3" /></TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}><Activity size={24} color="#64748b" /></TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}><Leaf size={24} color="#64748b" /></TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.navItem} 
+            onPress={() => setActiveTab('map')}
+          >
+            <MapIcon size={24} color={activeTab === 'map' ? "#00FFA3" : "#64748b"} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.navItem} 
+            onPress={() => setActiveTab('dashboard')}
+          >
+            <Activity size={24} color={activeTab === 'dashboard' ? "#00FFA3" : "#64748b"} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.navItem} 
+            onPress={() => setActiveTab('profile')}
+          >
+            <Leaf size={24} color={activeTab === 'profile' ? "#00FFA3" : "#64748b"} />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -362,5 +497,27 @@ const styles = StyleSheet.create({
   routeValue: { color: '#f8fafc', fontSize: 20, fontWeight: '900', marginVertical: 4 },
   routeSub: { color: '#64748b', fontSize: 11, fontWeight: '600' },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, backgroundColor: 'rgba(10, 10, 10, 0.95)', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingBottom: 20, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  navItem: { padding: 10 }
+  navItem: { padding: 10 },
+  
+  // New Styles
+  tabContent: { padding: 20 },
+  tabTitle: { color: '#f8fafc', fontSize: 28, fontWeight: '900', marginBottom: 25 },
+  statCardLarge: { backgroundColor: 'rgba(0,255,163,0.05)', borderRadius: 32, padding: 30, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,255,163,0.2)', marginBottom: 30 },
+  statLargeValue: { color: '#00FFA3', fontSize: 42, fontWeight: '900', marginTop: 15 },
+  statLargeLabel: { color: '#64748b', fontSize: 14, fontWeight: '600', marginTop: 5 },
+  divider: { width: '80%', height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 20 },
+  statSubText: { color: '#94a3b8', fontSize: 12, fontWeight: '700' },
+  historySection: { marginTop: 10 },
+  historyItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', padding: 15, borderRadius: 20, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  historyRoute: { color: '#f8fafc', fontSize: 14, fontWeight: '700' },
+  historyDate: { color: '#64748b', fontSize: 11, fontWeight: '500', marginTop: 2 },
+  historySaving: { color: '#00FFA3', fontSize: 14, fontWeight: '800' },
+  profileSection: { alignItems: 'center', marginBottom: 40 },
+  avatarLarge: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(0,255,163,0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,255,163,0.3)', marginBottom: 20 },
+  profileName: { color: '#f8fafc', fontSize: 22, fontWeight: '800' },
+  profileEmail: { color: '#64748b', fontSize: 14, fontWeight: '500', marginTop: 5 },
+  authButton: { backgroundColor: '#00FFA3', height: 55, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  authButtonText: { color: '#000', fontSize: 16, fontWeight: '800' },
+  authButtonOutline: { borderWidth: 1, borderColor: '#ef4444', height: 55, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  authButtonTextOutline: { color: '#ef4444', fontSize: 16, fontWeight: '800' }
 });

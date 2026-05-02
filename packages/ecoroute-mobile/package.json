@@ -19,7 +19,11 @@
     "expo-asset": "~12.0.13",
     "expo-constants": "~18.0.13",
     "react-native-safe-area-context": "~5.6.0",
-    "react-native-maps": "1.18.0"
+    "react-native-maps": "1.18.0",
+    "@clerk/clerk-expo": "^1.1.0",
+    "expo-secure-store": "*",
+    "expo-auth-session": "*",
+    "expo-web-browser": "*"
   },
   "private": true
 }

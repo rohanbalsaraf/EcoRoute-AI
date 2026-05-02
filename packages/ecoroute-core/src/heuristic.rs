@@ -12,14 +12,13 @@ use crate::graph::Node;
 // Used by: A* heuristic, nearest_node, AQI radius search
 // ----------------------------------------------------------------
 pub fn haversine(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-    let r    = 6371.0_f64;
+    let r = 6371.0_f64;
     let dlat = (lat2 - lat1).to_radians();
     let dlon = (lon2 - lon1).to_radians();
     let lat1 = lat1.to_radians();
     let lat2 = lat2.to_radians();
 
-    let a = (dlat / 2.0).sin().powi(2)
-        + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
+    let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
     let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
     r * c
@@ -35,19 +34,14 @@ pub fn haversine(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 // If this overestimates even once, A* gives wrong answers.
 // ----------------------------------------------------------------
 pub fn carbon_heuristic(node: &Node, end: &Node, vehicle: &Vehicle) -> f64 {
-    let straight_line_km = haversine(
-        node.lat, node.lon,
-        end.lat,  end.lon,
-    );
+    let straight_line_km = haversine(node.lat, node.lon, end.lat, end.lon);
 
     // Best case assumption:
     // - flat road (no gradient penalty)
     // - free flow traffic (no accel penalty)
     // - no traffic signals (no idle fuel)
     // - 80% of normal consumption (optimistic)
-    let min_carbon_per_km = vehicle.consumption_per_km()
-        * vehicle.emission_factor()
-        * 0.8;
+    let min_carbon_per_km = vehicle.consumption_per_km() * vehicle.emission_factor() * 0.8;
 
     straight_line_km * min_carbon_per_km
 }
@@ -56,12 +50,9 @@ pub fn carbon_heuristic(node: &Node, end: &Node, vehicle: &Vehicle) -> f64 {
 // time_heuristic — admissible heuristic when optimising for time
 // ----------------------------------------------------------------
 pub fn time_heuristic(node: &Node, end: &Node) -> f64 {
-    let straight_line_km = haversine(
-        node.lat, node.lon,
-        end.lat,  end.lon,
-    );
+    let straight_line_km = haversine(node.lat, node.lon, end.lat, end.lon);
     // Best case: 120 kmh max speed on any road
-    (straight_line_km / 120.0) * 60.0  // returns minutes
+    (straight_line_km / 120.0) * 60.0 // returns minutes
 }
 
 // ----------------------------------------------------------------
@@ -97,16 +88,32 @@ mod tests {
 
     #[test]
     fn test_heuristic_is_non_negative() {
-        let node = Node { id: 0, lat: 18.5204, lon: 73.8567 };
-        let end  = Node { id: 1, lat: 18.5912, lon: 73.7380 };
+        let node = Node {
+            id: 0,
+            lat: 18.5204,
+            lon: 73.8567,
+        };
+        let end = Node {
+            id: 1,
+            lat: 18.5912,
+            lon: 73.7380,
+        };
         let h = carbon_heuristic(&node, &end, &Vehicle::Petrol);
         assert!(h >= 0.0);
     }
 
     #[test]
     fn test_ev_heuristic_is_zero() {
-        let node = Node { id: 0, lat: 18.5204, lon: 73.8567 };
-        let end  = Node { id: 1, lat: 18.5912, lon: 73.7380 };
+        let node = Node {
+            id: 0,
+            lat: 18.5204,
+            lon: 73.8567,
+        };
+        let end = Node {
+            id: 1,
+            lat: 18.5912,
+            lon: 73.7380,
+        };
         let h = carbon_heuristic(&node, &end, &Vehicle::Ev);
         assert_eq!(h, 0.0, "EV heuristic should be 0 — no tailpipe");
     }

@@ -3,14 +3,14 @@
 // Module declarations — public API of the ecoroute-core crate
 // ================================================================
 
-pub mod graph;           // Node, Edge, RoadGraph, RouteResult, AllRoutes
-pub mod carbon;          // Vehicle, carbon_cost, travel_time_minutes
-pub mod heuristic;       // haversine, carbon_heuristic, time_heuristic
-pub mod priority_queue;  // State (min-heap ordering)
-pub mod algorithm;       // green_dijkstra, gdawa_star, find_all_routes
-pub mod rl_agent;        // Q-Learning Carbon Agent
-pub mod python;          // PyO3 bindings
+pub mod algorithm; // green_dijkstra, gdawa_star, find_all_routes
+pub mod carbon; // Vehicle, carbon_cost, travel_time_minutes
+pub mod graph; // Node, Edge, RoadGraph, RouteResult, AllRoutes
+pub mod heuristic; // haversine, carbon_heuristic, time_heuristic
+pub mod priority_queue; // State (min-heap ordering)
+pub mod python;
+pub mod rl_agent; // Q-Learning Carbon Agent // PyO3 bindings
 
+pub use algorithm::find_all_routes;
 pub use carbon::Vehicle;
 pub use graph::{AllRoutes, Edge, Node, OptimizeFor, RoadGraph, RouteResult};
-pub use algorithm::find_all_routes;

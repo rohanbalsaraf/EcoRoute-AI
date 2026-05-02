@@ -12,8 +12,8 @@ use std::cmp::Ordering;
 // ----------------------------------------------------------------
 #[derive(Debug, Clone, PartialEq)]
 pub struct State {
-    pub cost:     f64,    // g_cost for Dijkstra, f_cost for A*
-    pub position: usize,  // node index
+    pub cost: f64,       // g_cost for Dijkstra, f_cost for A*
+    pub position: usize, // node index
 }
 
 // Flip ordering so BinaryHeap becomes a min-heap
@@ -43,10 +43,22 @@ mod tests {
     #[test]
     fn test_min_heap_pops_lowest_cost_first() {
         let mut heap = BinaryHeap::new();
-        heap.push(State { cost: 5.0,  position: 0 });
-        heap.push(State { cost: 1.0,  position: 1 });
-        heap.push(State { cost: 10.0, position: 2 });
-        heap.push(State { cost: 3.0,  position: 3 });
+        heap.push(State {
+            cost: 5.0,
+            position: 0,
+        });
+        heap.push(State {
+            cost: 1.0,
+            position: 1,
+        });
+        heap.push(State {
+            cost: 10.0,
+            position: 2,
+        });
+        heap.push(State {
+            cost: 3.0,
+            position: 3,
+        });
 
         // Should pop in ascending cost order
         assert_eq!(heap.pop().unwrap().cost, 1.0);
@@ -58,8 +70,14 @@ mod tests {
     #[test]
     fn test_equal_costs_dont_panic() {
         let mut heap = BinaryHeap::new();
-        heap.push(State { cost: 2.0, position: 0 });
-        heap.push(State { cost: 2.0, position: 1 });
+        heap.push(State {
+            cost: 2.0,
+            position: 0,
+        });
+        heap.push(State {
+            cost: 2.0,
+            position: 1,
+        });
         // Should not panic
         assert!(heap.pop().is_some());
         assert!(heap.pop().is_some());

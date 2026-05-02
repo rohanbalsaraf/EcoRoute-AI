@@ -1,8 +1,10 @@
-use pyo3::prelude::*;
-use pyo3::exceptions::PyRuntimeError;
-use crate::graph::{RoadGraph, Node, Edge, AllRoutes, RouteResult, OptimizeFor, SavingsEquivalents};
-use crate::carbon::Vehicle;
 use crate::algorithm::find_all_routes;
+use crate::carbon::Vehicle;
+use crate::graph::{
+    AllRoutes, Edge, Node, OptimizeFor, RoadGraph, RouteResult, SavingsEquivalents,
+};
+use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::*;
 
 #[pyclass]
 pub struct PyRoadGraph {
@@ -45,9 +47,9 @@ pub fn calculate_routes(
     let vehicle = match vehicle_str.to_lowercase().as_str() {
         "petrol" => Vehicle::Petrol,
         "diesel" => Vehicle::Diesel,
-        "cng"    => Vehicle::Cng,
+        "cng" => Vehicle::Cng,
         "hybrid" => Vehicle::Hybrid,
-        "ev"     => Vehicle::Ev,
+        "ev" => Vehicle::Ev,
         _ => return Err(PyRuntimeError::new_err("Invalid vehicle type")),
     };
 
@@ -69,13 +71,36 @@ impl PyCarbonAgent {
         }
     }
 
-    pub fn predict_penalty(&self, current_speed: f64, speed_limit: f64, num_signals: u32, gradient: f64) -> f64 {
-        let state = crate::rl_agent::SegmentState::from_edge(current_speed, speed_limit, num_signals, gradient);
+    pub fn predict_penalty(
+        &self,
+        current_speed: f64,
+        speed_limit: f64,
+        num_signals: u32,
+        gradient: f64,
+    ) -> f64 {
+        let state = crate::rl_agent::SegmentState::from_edge(
+            current_speed,
+            speed_limit,
+            num_signals,
+            gradient,
+        );
         self.inner.predict_penalty(&state)
     }
 
-    pub fn update(&mut self, current_speed: f64, speed_limit: f64, num_signals: u32, gradient: f64, realized_ratio: f64) {
-        let state = crate::rl_agent::SegmentState::from_edge(current_speed, speed_limit, num_signals, gradient);
+    pub fn update(
+        &mut self,
+        current_speed: f64,
+        speed_limit: f64,
+        num_signals: u32,
+        gradient: f64,
+        realized_ratio: f64,
+    ) {
+        let state = crate::rl_agent::SegmentState::from_edge(
+            current_speed,
+            speed_limit,
+            num_signals,
+            gradient,
+        );
         self.inner.update(state, realized_ratio);
     }
 

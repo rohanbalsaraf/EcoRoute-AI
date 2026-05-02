@@ -5,7 +5,7 @@
 
 use crate::graph::Edge;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 // ----------------------------------------------------------------
 // Vehicle — belongs to the traveller, not the road
@@ -25,9 +25,9 @@ impl Vehicle {
         match self {
             Vehicle::Petrol => 0.06,
             Vehicle::Diesel => 0.055,
-            Vehicle::Cng    => 0.05,
+            Vehicle::Cng => 0.05,
             Vehicle::Hybrid => 0.035,
-            Vehicle::Ev     => 0.0,
+            Vehicle::Ev => 0.0,
         }
     }
 
@@ -36,9 +36,9 @@ impl Vehicle {
         match self {
             Vehicle::Petrol => 0.50,
             Vehicle::Diesel => 0.55,
-            Vehicle::Cng    => 0.45,
+            Vehicle::Cng => 0.45,
             Vehicle::Hybrid => 0.10, // hybrid shuts engine at idle
-            Vehicle::Ev     => 0.0,
+            Vehicle::Ev => 0.0,
         }
     }
 
@@ -47,9 +47,9 @@ impl Vehicle {
         match self {
             Vehicle::Petrol => 2.31,
             Vehicle::Diesel => 2.68,
-            Vehicle::Cng    => 1.63,
+            Vehicle::Cng => 1.63,
             Vehicle::Hybrid => 2.31,
-            Vehicle::Ev     => 0.0,  // zero tailpipe emissions
+            Vehicle::Ev => 0.0, // zero tailpipe emissions
         }
     }
 
@@ -59,18 +59,18 @@ impl Vehicle {
         match self {
             Vehicle::Petrol => "Petrol",
             Vehicle::Diesel => "Diesel",
-            Vehicle::Cng    => "CNG",
+            Vehicle::Cng => "CNG",
             Vehicle::Hybrid => "Hybrid",
-            Vehicle::Ev     => "EV",
+            Vehicle::Ev => "EV",
         }
     }
 }
 
 // Physics & Environmental Constants
-const GRADIENT_UPHILL_FACTOR: f64 = 0.03;   // 3% penalty per 1% slope
+const GRADIENT_UPHILL_FACTOR: f64 = 0.03; // 3% penalty per 1% slope
 const GRADIENT_DOWNHILL_FACTOR: f64 = 0.01; // 1% recovery per 1% slope
 const AVG_SIGNAL_WAIT_SECONDS: f64 = 45.0;
-const MAX_ACCEL_PENALTY: f64 = 0.5;         // Up to 50% extra fuel in congestion
+const MAX_ACCEL_PENALTY: f64 = 0.5; // Up to 50% extra fuel in congestion
 
 // ----------------------------------------------------------------
 // carbon_cost — kg CO2 for one vehicle on one road segment
@@ -102,10 +102,8 @@ pub fn carbon_cost(edge: &Edge, vehicle: &Vehicle) -> f64 {
     let accel_penalty = 1.0 + MAX_ACCEL_PENALTY * (1.0 - speed_ratio).powi(2);
 
     // --- fuel burned while moving ---
-    let moving_fuel = edge.distance_km
-        * vehicle.consumption_per_km()
-        * gradient_penalty
-        * accel_penalty;
+    let moving_fuel =
+        edge.distance_km * vehicle.consumption_per_km() * gradient_penalty * accel_penalty;
 
     // --- fuel burned idling at red lights ---
     let idle_time_hours = (edge.num_signals as f64 * AVG_SIGNAL_WAIT_SECONDS) / 3600.0;
@@ -179,26 +177,26 @@ mod tests {
 
     #[test]
     fn uphill_increases_cost() {
-        let mut flat  = sample_edge();
+        let mut flat = sample_edge();
         flat.gradient_pct = 0.0;
 
         let mut uphill = sample_edge();
         uphill.gradient_pct = 5.0;
 
-        let cost_flat   = carbon_cost(&flat,   &Vehicle::Petrol);
+        let cost_flat = carbon_cost(&flat, &Vehicle::Petrol);
         let cost_uphill = carbon_cost(&uphill, &Vehicle::Petrol);
         assert!(cost_uphill > cost_flat, "Uphill should cost more");
     }
 
     #[test]
     fn more_signals_increases_cost() {
-        let mut few  = sample_edge();
+        let mut few = sample_edge();
         few.num_signals = 1;
 
         let mut many = sample_edge();
         many.num_signals = 8;
 
-        let cost_few  = carbon_cost(&few,  &Vehicle::Petrol);
+        let cost_few = carbon_cost(&few, &Vehicle::Petrol);
         let cost_many = carbon_cost(&many, &Vehicle::Petrol);
         assert!(cost_many > cost_few, "More signals should cost more");
     }

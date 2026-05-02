@@ -1,14 +1,14 @@
-use pyo3::prelude::*;
-use serde::{Serialize, Deserialize};
 use kdtree::KdTree;
 use kdtree::distance::squared_euclidean;
+use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 
 // ----------------------------------------------------------------
 // Node — one intersection or point on the road network
 // ----------------------------------------------------------------
 #[derive(Debug, Clone, Serialize, Deserialize, FromPyObject)]
 pub struct Node {
-    pub id:  usize,
+    pub id: usize,
     pub lat: f64,
     pub lon: f64,
 }
@@ -18,12 +18,12 @@ pub struct Node {
 // ----------------------------------------------------------------
 #[derive(Debug, Clone, Serialize, Deserialize, FromPyObject)]
 pub struct Edge {
-    pub to:                usize,
-    pub distance_km:       f64,
-    pub speed_limit_kmh:   f64,
+    pub to: usize,
+    pub distance_km: f64,
+    pub speed_limit_kmh: f64,
     pub current_speed_kmh: f64,
-    pub gradient_pct:      f64,
-    pub num_signals:       u32,
+    pub gradient_pct: f64,
+    pub num_signals: u32,
 }
 
 // ----------------------------------------------------------------
@@ -32,19 +32,19 @@ pub struct Edge {
 #[pyclass(eq, eq_int)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum OptimizeFor {
-    Carbon,    // lowest CO2  — green route
-    Time,      // lowest time — fastest route
-    Distance,  // lowest km   — shortest route
+    Carbon,   // lowest CO2  — green route
+    Time,     // lowest time — fastest route
+    Distance, // lowest km   — shortest route
 }
 
 // ----------------------------------------------------------------
 // RoadGraph — full road network for a city
 // ----------------------------------------------------------------
 pub struct RoadGraph {
-    pub nodes:     Vec<Node>,
+    pub nodes: Vec<Node>,
     pub adjacency: Vec<Vec<Edge>>,
     #[allow(dead_code)]
-    pub tree:      KdTree<f64, usize, [f64; 2]>,
+    pub tree: KdTree<f64, usize, [f64; 2]>,
 }
 
 impl RoadGraph {
@@ -53,7 +53,11 @@ impl RoadGraph {
         for node in &nodes {
             let _ = tree.add([node.lat, node.lon], node.id);
         }
-        Self { nodes, adjacency, tree }
+        Self {
+            nodes,
+            adjacency,
+            tree,
+        }
     }
 
     pub fn node_count(&self) -> usize {
@@ -93,11 +97,11 @@ impl RoadGraph {
 #[pyclass(get_all)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouteResult {
-    pub path:              Vec<usize>,
-    pub total_carbon_kg:   f64,
+    pub path: Vec<usize>,
+    pub total_carbon_kg: f64,
     pub total_distance_km: f64,
-    pub total_time_min:    f64,
-    pub optimize_for:      OptimizeFor,
+    pub total_time_min: f64,
+    pub optimize_for: OptimizeFor,
 }
 
 // ----------------------------------------------------------------
@@ -106,18 +110,18 @@ pub struct RouteResult {
 #[pyclass(get_all)]
 #[derive(Debug)]
 pub struct SavingsEquivalents {
-    pub smartphones_charged:   f64,
+    pub smartphones_charged: f64,
     #[allow(dead_code)]
     pub trees_days_equivalent: f64,
-    pub km_not_driven:         f64,
+    pub km_not_driven: f64,
 }
 
 impl RouteResult {
     pub fn savings_equivalents(saved_kg: f64) -> SavingsEquivalents {
         SavingsEquivalents {
-            smartphones_charged:   saved_kg / 0.00822,
+            smartphones_charged: saved_kg / 0.00822,
             trees_days_equivalent: saved_kg / (21.7 / 365.0),
-            km_not_driven:         saved_kg / 0.21,
+            km_not_driven: saved_kg / 0.21,
         }
     }
 }
@@ -129,7 +133,7 @@ impl RouteResult {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AllRoutes {
     pub greenest: RouteResult,
-    pub fastest:  RouteResult,
+    pub fastest: RouteResult,
     pub shortest: RouteResult,
 }
 
@@ -140,21 +144,27 @@ impl AllRoutes {
 
     pub fn print_comparison(&self) {
         println!("\n┌─────────────┬────────────┬──────────┬────────────┐");
-        println!(  "│ Route       │ Distance   │ Time     │ Carbon     │");
-        println!(  "├─────────────┼────────────┼──────────┼────────────┤");
-        println!("│ Greenest ✓  │ {:>7.1} km │ {:>5.0} min │ {:>7.4} kg │",
+        println!("│ Route       │ Distance   │ Time     │ Carbon     │");
+        println!("├─────────────┼────────────┼──────────┼────────────┤");
+        println!(
+            "│ Greenest ✓  │ {:>7.1} km │ {:>5.0} min │ {:>7.4} kg │",
             self.greenest.total_distance_km,
             self.greenest.total_time_min,
-            self.greenest.total_carbon_kg);
-        println!("│ Fastest     │ {:>7.1} km │ {:>5.0} min │ {:>7.4} kg │",
+            self.greenest.total_carbon_kg
+        );
+        println!(
+            "│ Fastest     │ {:>7.1} km │ {:>5.0} min │ {:>7.4} kg │",
             self.fastest.total_distance_km,
             self.fastest.total_time_min,
-            self.fastest.total_carbon_kg);
-        println!("│ Shortest    │ {:>7.1} km │ {:>5.0} min │ {:>7.4} kg │",
+            self.fastest.total_carbon_kg
+        );
+        println!(
+            "│ Shortest    │ {:>7.1} km │ {:>5.0} min │ {:>7.4} kg │",
             self.shortest.total_distance_km,
             self.shortest.total_time_min,
-            self.shortest.total_carbon_kg);
-        println!(  "└─────────────┴────────────┴──────────┴────────────┘");
+            self.shortest.total_carbon_kg
+        );
+        println!("└─────────────┴────────────┴──────────┴────────────┘");
 
         let saved = self.carbon_saved_vs_fastest();
         if saved > 0.0 {

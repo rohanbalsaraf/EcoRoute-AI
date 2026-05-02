@@ -130,7 +130,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://ecoroute:ecoroute_password@localhost:5432/ecoroute_test
           REDIS_URL: redis://localhost:6379/0
-          CLERK_SECRET_KEY: test_secret
+          CLERK_SECRET_KEY: sk_test_ZWNvcm91dGUtY2xlcmstbW9jay1zZWNyZXR0ZXN0
           LEMON_SQUEEZY_WEBHOOK_SECRET: test_secret
           SENTRY_DSN: ""
 
@@ -156,8 +156,8 @@ jobs:
       - name: Build Web
         run: pnpm --filter ecoroute-web run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: test_key
-          CLERK_SECRET_KEY: test_secret
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZWNvcm91dGUtY2xlcmstbW9jay1rZXktest
+          CLERK_SECRET_KEY: sk_test_ZWNvcm91dGUtY2xlcmstbW9jay1zZWNyZXR0ZXN0
           NEXT_PUBLIC_API_URL: http://localhost:8000
           
       - name: Install Playwright Browsers
@@ -167,8 +167,8 @@ jobs:
         run: pnpm --filter ecoroute-web run test:e2e
         continue-on-error: true # Allow failure until full E2E suite is stable
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: test_key
-          CLERK_SECRET_KEY: test_secret
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZWNvcm91dGUtY2xlcmstbW9jay1rZXktest
+          CLERK_SECRET_KEY: sk_test_ZWNvcm91dGUtY2xlcmstbW9jay1zZWNyZXR0ZXN0
           NEXT_PUBLIC_API_URL: http://localhost:8000
 
   ecoroute-agent:

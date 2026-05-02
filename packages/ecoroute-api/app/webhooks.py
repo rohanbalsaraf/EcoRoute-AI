@@ -79,6 +79,9 @@ async def lemonsqueezy_webhook(
 
     body = await request.body()
     
+    if not x_signature:
+        raise HTTPException(status_code=400, detail="Missing signature")
+
     if LEMON_SQUEEZY_WEBHOOK_SECRET:
         digest = hmac.new(
             LEMON_SQUEEZY_WEBHOOK_SECRET.encode(), 
@@ -87,7 +90,7 @@ async def lemonsqueezy_webhook(
         ).hexdigest()
         
         if not hmac.compare_digest(digest, x_signature):
-            raise HTTPException(status_code=400, detail="Invalid signature")
+            raise HTTPException(status_code=401, detail="Invalid signature")
 
     payload = await request.json()
     event_name = payload.get("meta", {}).get("event_name")

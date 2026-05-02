@@ -4,7 +4,6 @@
 # LLM Tool definitions for the EcoRoute Assistant
 # ================================================================
 
-from typing import Optional
 from langchain.tools import tool
 from ecoroute import EcoRouteClient
 

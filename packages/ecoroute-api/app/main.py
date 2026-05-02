@@ -3,6 +3,7 @@ import os
 import time
 import redis
 import sentry_sdk
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -21,11 +22,18 @@ from .database import get_db  # noqa: E402
 from .models import User, Subscription  # noqa: E402
 from . import graph_store  # noqa: E402
 from .webhooks import router as webhooks_router  # noqa: E402
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    graph_store.init_graph()
+    yield
+    # Shutdown (if needed)
 
 app = FastAPI(
     title="EcoRoute API",
     description="Carbon-aware routing API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -92,11 +100,7 @@ async def rate_limit(request: Request, api_key_data: dict = Depends(verify_api_k
         
     return api_key_data
 
-app.include_router(webhooks_router, prefix="/api/v1")
-
-@app.on_event("startup")
-async def startup_event():
-    graph_store.init_graph()
+app.include_router(webhooks_router, prefix="/v1")
 
 @app.get("/")
 def read_root():

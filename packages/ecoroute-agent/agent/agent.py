@@ -4,7 +4,6 @@
 # EcoRoute AI Assistant — ReAct Agent
 # ================================================================
 
-import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentType, initialize_agent

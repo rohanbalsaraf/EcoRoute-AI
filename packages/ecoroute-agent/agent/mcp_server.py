@@ -6,7 +6,7 @@
 
 import asyncio
 from mcp.server import Server
-from .tools import find_greenest_route, compare_vehicle_emissions, get_eco_tips
+from .tools import find_greenest_route, compare_vehicle_emissions
 
 app = Server("ecoroute-server")
 

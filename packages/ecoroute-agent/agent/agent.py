@@ -6,7 +6,8 @@
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain.agents import AgentType, initialize_agent
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain import hub
 from .tools import find_greenest_route, compare_vehicle_emissions, get_eco_tips
 
 load_dotenv()
@@ -19,10 +20,17 @@ class EcoRouteAssistant:
             compare_vehicle_emissions,
             get_eco_tips
         ]
-        self.agent = initialize_agent(
-            self.tools,
-            self.llm,
-            agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+        
+        # Get the standard ReAct prompt
+        prompt = hub.pull("hwchase17/react")
+        
+        # Create the modern ReAct agent
+        agent = create_react_agent(self.llm, self.tools, prompt)
+        
+        # Create the executor
+        self.agent_executor = AgentExecutor(
+            agent=agent,
+            tools=self.tools,
             verbose=True,
             handle_parsing_errors=True
         )
@@ -31,11 +39,11 @@ class EcoRouteAssistant:
         """
         Main entry point for the AI assistant.
         """
-        response = await self.agent.arun(
-            input=message,
-            chat_history=chat_history
-        )
-        return response
+        response = await self.agent_executor.ainvoke({
+            "input": message,
+            "chat_history": chat_history
+        })
+        return response["output"]
 
 if __name__ == "__main__":
     import asyncio

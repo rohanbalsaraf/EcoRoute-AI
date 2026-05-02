@@ -65,6 +65,7 @@ class EcoRouteClient:
         self._weather = WeatherClient()
         self._osrm = OSRMClient()
         self._optimizer = Optimizer()
+        self._geocoding_cache: dict[str, Waypoint] = {}
 
     # ----------------------------------------------------------------
     # find_routes — main method
@@ -78,40 +79,70 @@ class EcoRouteClient:
         """
         Find greenest, fastest, and shortest routes between two points.
         """
-        # Resolve vehicle type
-        if isinstance(vehicle, str):
-            vehicle = VehicleType(vehicle.lower())
+        results = await self.find_routes_bulk(origin, destination, [vehicle])
+        return results[0] if results else None
 
-        # Resolve coordinates
+    async def find_routes_bulk(
+        self,
+        origin: str | Coordinate,
+        destination: str | Coordinate,
+        vehicles: list[str | VehicleType],
+    ) -> list[RouteResponse]:
+        """
+        Find routes for multiple vehicles efficiently by reusing geocoding and graph building.
+        """
+        if not vehicles:
+            return []
+
+        # Resolve vehicles
+        resolved_vehicles = [
+            VehicleType(v.lower()) if isinstance(v, str) else v for v in vehicles
+        ]
+
+        # Resolve coordinates (uses cache)
         origin_wp = await self._resolve_location(origin)
         dest_wp = await self._resolve_location(destination)
 
         if origin_wp is None or dest_wp is None:
-            return None
+            return []
 
         # OPTION A: Call Remote EcoRoute API (Production Mode)
         if self.api_url:
-            return await self._fetch_remote_routes(origin_wp, dest_wp, vehicle)
+            # For now, call in a loop or add a bulk endpoint to the API
+            # Ideally we add a bulk endpoint to the API to avoid multiple network calls
+            tasks = [
+                self._fetch_remote_routes(origin_wp, dest_wp, v)
+                for v in resolved_vehicles
+            ]
+            results = await asyncio.gather(*tasks)
+            return [r for r in results if r is not None]
 
         # OPTION B: Build Local Graph from OSRM (SDK Mode)
+        # We build the graph ONCE and then run optimizer for each vehicle
         nodes, adjacency = await self._build_real_graph(
             origin_wp.coordinate,
             dest_wp.coordinate,
-            vehicle,
+            resolved_vehicles,
         )
 
         if not nodes:
-            return None
+            return []
 
-        return self._optimizer.find_routes(
-            nodes=nodes,
-            adjacency=adjacency,
-            start=0,
-            end=len(nodes) - 1,
-            vehicle=vehicle,
-            origin_wp=origin_wp,
-            dest_wp=dest_wp,
-        )
+        final_results = []
+        for v in resolved_vehicles:
+            res = self._optimizer.find_routes(
+                nodes=nodes,
+                adjacency=adjacency,
+                start=0,
+                end=len(nodes) - 1,
+                vehicle=v,
+                origin_wp=origin_wp,
+                dest_wp=dest_wp,
+            )
+            if res:
+                final_results.append(res)
+
+        return final_results
 
     async def _fetch_remote_routes(
         self, origin: Waypoint, dest: Waypoint, vehicle: VehicleType
@@ -160,14 +191,27 @@ class EcoRouteClient:
     ) -> float:
         """
         Calculate total carbon for a multi-stop journey.
-        Useful for delivery route optimization.
+        Resolves all waypoints first to avoid redundant geocoding.
         """
         if isinstance(vehicle, str):
             vehicle = VehicleType(vehicle.lower())
 
+        # 1. Resolve all waypoints first (uses cache)
+        resolved_wps = await asyncio.gather(
+            *[self._resolve_location(wp) for wp in waypoints]
+        )
+        resolved_wps = [wp for wp in resolved_wps if wp is not None]
+
+        if len(resolved_wps) < 2:
+            return 0.0
+
+        # 2. Calculate segments
         total_carbon = 0.0
-        for i in range(len(waypoints) - 1):
-            result = await self.find_routes(waypoints[i], waypoints[i + 1], vehicle)
+        # We still call find_routes for each segment, but geocoding is now cached
+        for i in range(len(resolved_wps) - 1):
+            result = await self.find_routes(
+                resolved_wps[i].coordinate, resolved_wps[i + 1].coordinate, vehicle
+            )
             if result:
                 total_carbon += result.greenest.total_carbon_kg
 
@@ -177,21 +221,40 @@ class EcoRouteClient:
     # Internal helpers
     # ----------------------------------------------------------------
     async def _resolve_location(self, location: str | Coordinate) -> Optional[Waypoint]:
+        cache_key = (
+            f"{location.lat},{location.lon}"
+            if isinstance(location, Coordinate)
+            else location
+        )
+
+        if cache_key in self._geocoding_cache:
+            return self._geocoding_cache[cache_key]
+
         if isinstance(location, Coordinate):
             name = await self._geocoder.reverse_geocode(location.lat, location.lon)
-            return Waypoint(name=name or "Unknown", coordinate=location)
-        return await self._geocoder.geocode(location)
+            wp = Waypoint(name=name or "Unknown", coordinate=location)
+        else:
+            wp = await self._geocoder.geocode(location)
+
+        if wp:
+            self._geocoding_cache[cache_key] = wp
+        return wp
 
     async def _build_real_graph(
         self,
         origin: Coordinate,
         destination: Coordinate,
-        vehicle: VehicleType,
+        vehicles: list[VehicleType] | VehicleType,
     ) -> tuple[list[PyNode], list[list[PyEdge]]]:
         """
         Build a real routing graph by fetching a base route from OSRM
         and then augmenting the edges with live environmental data.
+        Samples weather at multiple points for accuracy.
         """
+        # Ensure vehicles is a list
+        if not isinstance(vehicles, list):
+            vehicles = [vehicles]
+
         # Fetch base route with steps
         raw_osrm = await self._osrm.get_route(origin, destination)
         if not raw_osrm:
@@ -201,19 +264,27 @@ class EcoRouteClient:
         if not steps:
             return [], []
 
-        # Concurrent data fetching for midpoint
+        # Multi-point weather/AQI sampling (Origin, Destination, Midpoint)
         mid_lat = (origin.lat + destination.lat) / 2
         mid_lon = (origin.lon + destination.lon) / 2
 
-        weather, aqi = await asyncio.gather(
-            self._weather.get_weather(mid_lat, mid_lon),
-            self._aqi.get_aqi(mid_lat, mid_lon),
-            return_exceptions=True,
-        )
+        sample_points = [
+            (origin.lat, origin.lon),
+            (destination.lat, destination.lon),
+            (mid_lat, mid_lon),
+        ]
 
-        weather_penalty = 1.0
-        if isinstance(weather, WeatherData):
-            weather_penalty = weather.fuel_penalty()
+        weather_tasks = [self._weather.get_weather(lat, lon) for lat, lon in sample_points]
+        weather_results = await asyncio.gather(*weather_tasks, return_exceptions=True)
+
+        penalties = []
+        for w in weather_results:
+            if isinstance(w, WeatherData):
+                penalties.append(w.fuel_penalty())
+            else:
+                penalties.append(1.0)
+
+        weather_penalty = sum(penalties) / len(penalties)
 
         # aqi_factor was calculated here previously but removed due to F841 since it was unused
 

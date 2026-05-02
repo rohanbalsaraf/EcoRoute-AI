@@ -33,17 +33,16 @@ async def compare_vehicle_emissions(origin: str, destination: str) -> str:
     """
     try:
         vehicles = ["petrol", "diesel", "cng", "hybrid", "ev"]
-        results = []
-        
-        for v in vehicles:
-            res = await client.find_routes(origin, destination, v)
-            if res:
-                results.append(f"- {v.upper()}: {res.greenest.total_carbon_kg:.2f} kg CO2")
+        results = await client.find_routes_bulk(origin, destination, vehicles)
         
         if not results:
             return "No data available for this trip."
+        
+        output = ["Carbon Footprint Comparison:"]
+        for res in results:
+            output.append(f"- {res.vehicle.value.upper()}: {res.greenest.total_carbon_kg:.2f} kg CO2")
             
-        return "Carbon Footprint Comparison:\n" + "\n".join(results)
+        return "\n".join(output)
     except Exception as e:
         return f"Error comparing vehicles: {str(e)}"
 

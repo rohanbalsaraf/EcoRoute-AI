@@ -66,31 +66,33 @@ class PyNode:
 # ----------------------------------------------------------------
 # Carbon cost function — mirrors carbon.rs exactly
 # ----------------------------------------------------------------
+# Physics Constants
+GRADIENT_UPHILL_FACTOR = 0.03
+GRADIENT_DOWNHILL_FACTOR = 0.01
+AVG_SIGNAL_WAIT_SECONDS = 45.0
+MAX_ACCEL_PENALTY = 0.5
+
+
+# ----------------------------------------------------------------
+# Carbon cost function — mirrors carbon.rs exactly
+# ----------------------------------------------------------------
 def _carbon_cost(edge: PyEdge, vehicle: VehicleType) -> float:
     # gradient penalty
     if edge.gradient_pct > 0:
-        gradient_penalty = 1.0 + (edge.gradient_pct * 0.03)
+        gradient_penalty = 1.0 + (edge.gradient_pct * GRADIENT_UPHILL_FACTOR)
     elif edge.gradient_pct < 0:
-        gradient_penalty = 1.0 + (edge.gradient_pct * 0.01)
+        gradient_penalty = 1.0 + (edge.gradient_pct * GRADIENT_DOWNHILL_FACTOR)
     else:
         gradient_penalty = 1.0
 
-    # acceleration penalty
+    # acceleration penalty (squared continuous function)
     speed_ratio = (
         edge.current_speed_kmh / edge.speed_limit_kmh
         if edge.speed_limit_kmh > 0
         else 1.0
     )
     speed_ratio = max(0.0, min(1.0, speed_ratio))
-
-    if speed_ratio < 0.3:
-        accel_penalty = 1.50
-    elif speed_ratio < 0.5:
-        accel_penalty = 1.25
-    elif speed_ratio < 0.7:
-        accel_penalty = 1.10
-    else:
-        accel_penalty = 1.00
+    accel_penalty = 1.0 + MAX_ACCEL_PENALTY * (1.0 - speed_ratio) ** 2
 
     # moving fuel
     moving_fuel = (
@@ -101,7 +103,7 @@ def _carbon_cost(edge: PyEdge, vehicle: VehicleType) -> float:
     )
 
     # idle fuel at signals
-    idle_hours = (edge.num_signals * 45.0) / 3600.0
+    idle_hours = (edge.num_signals * AVG_SIGNAL_WAIT_SECONDS) / 3600.0
     idle_fuel = idle_hours * _idle_consumption(vehicle)
 
     total_fuel = moving_fuel + idle_fuel
@@ -120,7 +122,9 @@ def _idle_consumption(vehicle: VehicleType) -> float:
 
 def _travel_time_minutes(edge: PyEdge) -> float:
     speed = edge.current_speed_kmh if edge.current_speed_kmh > 0 else 5.0
-    return (edge.distance_km / speed) * 60.0 + (edge.num_signals * 45.0 / 60.0)
+    return (edge.distance_km / speed) * 60.0 + (
+        edge.num_signals * AVG_SIGNAL_WAIT_SECONDS / 60.0
+    )
 
 
 # ----------------------------------------------------------------
@@ -150,12 +154,13 @@ def _green_dijkstra(
     end: int,
     vehicle: VehicleType,
     weight: str = "carbon",  # "carbon" | "time" | "distance"
-) -> Optional[tuple[float, list[int]]]:
+) -> Optional[tuple[float, list[int], list[PyEdge]]]:
     import heapq
 
     n = len(adjacency)
     cost = [math.inf] * n
-    prev = [-1] * n
+    prev_node = [-1] * n
+    prev_edge = [None] * n
     visited = [False] * n
 
     cost[start] = 0.0
@@ -183,58 +188,43 @@ def _green_dijkstra(
             new_cost = c + w
             if new_cost < cost[edge.to]:
                 cost[edge.to] = new_cost
-                prev[edge.to] = u
+                prev_node[edge.to] = u
+                prev_edge[edge.to] = edge
                 heapq.heappush(heap, (new_cost, edge.to))
 
     if math.isinf(cost[end]):
         return None
 
-    # reconstruct path
-    path = []
+    # reconstruct path and collect edges in one pass
+    path_nodes = []
+    path_edges = []
     current = end
     while current != -1:
-        path.append(current)
-        current = prev[current]
-    path.reverse()
+        path_nodes.append(current)
+        edge = prev_edge[current]
+        if edge:
+            path_edges.append(edge)
+        current = prev_node[current]
 
-    return cost[end], path
+    path_nodes.reverse()
+    path_edges.reverse()
+
+    return cost[end], path_nodes, path_edges
 
 
-def _total_carbon(
-    adjacency: list[list[PyEdge]],
-    path: list[int],
+def _calculate_metrics(
+    edges: list[PyEdge],
     vehicle: VehicleType,
-) -> float:
-    total = 0.0
-    for i in range(len(path) - 1):
-        u, v = path[i], path[i + 1]
-        for edge in adjacency[u]:
-            if edge.to == v:
-                total += _carbon_cost(edge, vehicle)
-                break
-    return total
-
-
-def _total_distance(adjacency: list[list[PyEdge]], path: list[int]) -> float:
-    total = 0.0
-    for i in range(len(path) - 1):
-        u, v = path[i], path[i + 1]
-        for edge in adjacency[u]:
-            if edge.to == v:
-                total += edge.distance_km
-                break
-    return total
-
-
-def _total_time(adjacency: list[list[PyEdge]], path: list[int]) -> float:
-    total = 0.0
-    for i in range(len(path) - 1):
-        u, v = path[i], path[i + 1]
-        for edge in adjacency[u]:
-            if edge.to == v:
-                total += _travel_time_minutes(edge)
-                break
-    return total
+) -> tuple[float, float, float]:
+    """Calculate carbon, distance, and time for a list of edges in one pass."""
+    carbon = 0.0
+    distance = 0.0
+    time = 0.0
+    for edge in edges:
+        carbon += _carbon_cost(edge, vehicle)
+        distance += edge.distance_km
+        time += _travel_time_minutes(edge)
+    return carbon, distance, time
 
 
 # ----------------------------------------------------------------
@@ -290,25 +280,24 @@ class Optimizer:
     ) -> Optional[RouteResponse]:
 
         # Run three variants
-        green_raw = _green_dijkstra(nodes, adjacency, start, end, vehicle, "carbon")
-        time_raw = _green_dijkstra(nodes, adjacency, start, end, vehicle, "time")
-        dist_raw = _green_dijkstra(nodes, adjacency, start, end, vehicle, "distance")
+        green_res = _green_dijkstra(nodes, adjacency, start, end, vehicle, "carbon")
+        time_res = _green_dijkstra(nodes, adjacency, start, end, vehicle, "time")
+        dist_res = _green_dijkstra(nodes, adjacency, start, end, vehicle, "distance")
 
-        if not green_raw or not time_raw or not dist_raw:
+        if not green_res or not time_res or not dist_res:
             return None
 
-        green_cost, green_path = green_raw
-        time_cost, time_path = time_raw
-        dist_cost, dist_path = dist_raw
+        green_cost, green_path, green_edges = green_res
+        time_cost, time_path, time_edges = time_res
+        dist_cost, dist_path, dist_edges = dist_res
 
         def make_route(
             label: str,
             optimize_for: OptimizeFor,
             path: list[int],
-            carbon_kg: float,
-            distance_km: float,
-            time_min: float,
+            edges: list[PyEdge],
         ) -> Route:
+            carbon_kg, distance_km, time_min = _calculate_metrics(edges, vehicle)
             waypoints = [
                 Waypoint(
                     name=nodes[i].name or f"Node {i}",
@@ -328,30 +317,9 @@ class Optimizer:
                 vehicle=vehicle,
             )
 
-        greenest = make_route(
-            "Greenest",
-            OptimizeFor.CARBON,
-            green_path,
-            green_cost,
-            _total_distance(adjacency, green_path),
-            _total_time(adjacency, green_path),
-        )
-        fastest = make_route(
-            "Fastest",
-            OptimizeFor.TIME,
-            time_path,
-            _total_carbon(adjacency, time_path, vehicle),
-            _total_distance(adjacency, time_path),
-            time_cost,
-        )
-        shortest = make_route(
-            "Shortest",
-            OptimizeFor.DISTANCE,
-            dist_path,
-            _total_carbon(adjacency, dist_path, vehicle),
-            dist_cost,
-            _total_time(adjacency, dist_path),
-        )
+        greenest = make_route("Greenest", OptimizeFor.CARBON, green_path, green_edges)
+        fastest = make_route("Fastest", OptimizeFor.TIME, time_path, time_edges)
+        shortest = make_route("Shortest", OptimizeFor.DISTANCE, dist_path, dist_edges)
 
         return RouteResponse(
             origin=origin_wp,

@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from typing import List
+from pydantic import BaseModel
 
 # Initialize Sentry
 SENTRY_DSN = os.getenv("SENTRY_DSN")
@@ -137,9 +139,6 @@ def health_check(db: Session = Depends(get_db)):
         
     return status
 
-from pydantic import BaseModel  # noqa: E402
-
-from typing import List, Dict
 
 class RouteRequest(BaseModel):
     origin_lat: float

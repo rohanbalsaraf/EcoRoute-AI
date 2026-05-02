@@ -57,7 +57,8 @@ def fetch_elevations(nodes_map, used_nodes):
             else:
                 print(f"⚠️ Elevation API error: {response.status_code}")
                 # Fallback to 0
-                for nid in node_ids[i:i+chunk_size]: elevations[nid] = 0
+                for nid in node_ids[i:i+chunk_size]:
+                    elevations[nid] = 0
         return elevations
     except Exception as e:
         print(f"⚠️ Elevation fetch failed: {e}")
@@ -79,7 +80,8 @@ def process_osm_to_graph(osm_data):
     for element in osm_data['elements']:
         if element['type'] == 'way':
             for nid in element.get('nodes', []):
-                if nid in nodes_map: used_nodes.add(nid)
+                if nid in nodes_map:
+                    used_nodes.add(nid)
     
     # 3. Fetch elevations
     elevations = fetch_elevations(nodes_map, used_nodes)

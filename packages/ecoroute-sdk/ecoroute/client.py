@@ -119,7 +119,8 @@ class EcoRouteClient:
                     results = {}
                     for v_str, res in data["comparisons"].items():
                         v_type = VehicleType(v_str)
-                        if "error" in res: continue
+                        if "error" in res:
+                            continue
                         
                         results[v_type] = RouteResponse(
                             origin=origin_wp,

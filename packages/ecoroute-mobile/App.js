@@ -19,7 +19,6 @@ import * as SecureStore from 'expo-secure-store';
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 import { ClerkProvider, SignedIn, SignedOut, useAuth, useUser, useOAuth } from '@clerk/clerk-expo';
-import { LinearGradient } from 'expo-linear-gradient';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -308,9 +307,9 @@ function MainApp() {
                 </View>
 
                 <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-                  <LinearGradient colors={['#00FFA3', '#00D187']} style={styles.gradientSearch}>
+                  <View style={[styles.gradientSearch, { backgroundColor: '#00FFA3' }]}>
                     {isSearching ? <ActivityIndicator color="#000" /> : <ArrowRight size={20} color="#000" />}
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -453,14 +452,14 @@ function MainApp() {
 
         {isNavigating && (
           <View style={styles.navOverlay}>
-            <LinearGradient colors={['#00FFA3', '#00D187']} style={styles.navGradient}>
+            <View style={[styles.navGradient, { backgroundColor: '#00FFA3' }]}>
               <Navigation size={48} color="#000" />
               <Text style={styles.navActiveTitle}>Navigation Active</Text>
               <Text style={styles.navActiveSub}>Following Greenest Route</Text>
               <TouchableOpacity style={styles.stopButton} onPress={() => setIsNavigating(false)}>
                 <Text style={styles.stopButtonText}>Stop Journey</Text>
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
           </View>
         )}
 

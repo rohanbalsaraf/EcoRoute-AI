@@ -19,6 +19,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 import { ClerkProvider, SignedIn, SignedOut, useAuth, useUser, useOAuth } from '@clerk/clerk-expo';
+import { LinearGradient } from 'expo-linear-gradient';
 
 WebBrowser.maybeCompleteAuthSession();
 

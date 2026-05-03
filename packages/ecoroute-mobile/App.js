@@ -206,7 +206,9 @@ function MainApp() {
       if (!res.ok) throw new Error(data.detail || "Route calculation failed");
 
       const compare = data.comparisons[selectedVehicle];
-      
+      if (!compare) throw new Error(`No data returned for ${selectedVehicle}`);
+      if (compare.error) throw new Error(compare.error);
+
       setRawRoutes({
         eco: {
           coordinates: [],

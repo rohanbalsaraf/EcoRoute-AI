@@ -202,8 +202,10 @@ def calculate_route(request: RouteRequest, api_key_data: dict = Depends(verify_a
 
         # 2. Call the Rust engine
         import ecoroute_core
+        VEHICLE_MAP = {"bike": "petrol"}
+        core_vehicle = VEHICLE_MAP.get(request.vehicle.lower(), request.vehicle.lower())
         try:
-            routes = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, request.vehicle)
+            routes = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, core_vehicle)
         except Exception as e:
             if "No path found" in str(e):
                 raise HTTPException(status_code=404, detail="No road path found between these locations in the current OSM data.")
@@ -311,9 +313,11 @@ async def compare_routes(
         results = {}
         
         # 2. Iterate through vehicles
+        VEHICLE_MAP = {"bike": "petrol"} # Map mobile 'bike' to core 'petrol'
         for vehicle in request.vehicles:
+            core_vehicle = VEHICLE_MAP.get(vehicle.lower(), vehicle.lower())
             try:
-                routes = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, vehicle)
+                routes = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, core_vehicle)
                 
                 def format_route(route_obj, label, opt_for):
                     return {

@@ -17,7 +17,19 @@ import { Leaf, Navigation, Zap, Bike, Fuel, Activity, Clock, Map as MapIcon, Sea
 import MapView, { Polyline, Marker } from 'react-native-maps';
 import * as SecureStore from 'expo-secure-store';
 import * as Location from 'expo-location';
-import { ClerkProvider, SignedIn, SignedOut, useAuth, useUser } from '@clerk/clerk-expo';
+import * as WebBrowser from 'expo-web-browser';
+import { ClerkProvider, SignedIn, SignedOut, useAuth, useUser, useOAuth } from '@clerk/clerk-expo';
+
+WebBrowser.maybeCompleteAuthSession();
+
+function useWarmUpBrowser() {
+  useEffect(() => {
+    void WebBrowser.warmUpAsync();
+    return () => {
+      void WebBrowser.coolDownAsync();
+    };
+  }, []);
+}
 
 const tokenCache = {
   async getToken(key) {
@@ -90,14 +102,27 @@ export default function App() {
     </ClerkProvider>
   );
 }
-
 function MainApp() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
-  const { getToken } = useAuth();
+  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
+  useWarmUpBrowser();
+
   const [activeTab, setActiveTab] = useState('map'); 
-  const [stats, setStats] = useState({ saved_co2: "0.0", api_calls: 0, tier: "Free" });
+  const [stats, setStats] = useState({ total_carbon_saved: "0.0", api_calls: 0, tier: "Free" });
   const [history, setHistory] = useState([]);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const onSignInPress = async () => {
+    try {
+      const { createdSessionId, setActive } = await startOAuthFlow();
+      if (createdSessionId) {
+        setActive({ session: createdSessionId });
+      }
+    } catch (err) {
+      console.error("OAuth error", err);
+    }
+  };
 
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
@@ -120,7 +145,14 @@ function MainApp() {
           const statsRes = await fetchWithTimeout(`${API_BASE_URL}/internal/dashboard/stats`, {
             headers: { Authorization: `Bearer ${token}` }
           });
-          if (statsRes.ok) setStats(await statsRes.json());
+          if (statsRes.ok) {
+            const s = await statsRes.json();
+            setStats({
+              total_carbon_saved: s.total_carbon_saved,
+              api_calls: s.api_calls_this_month,
+              tier: s.tier
+            });
+          }
 
           const historyRes = await fetchWithTimeout(`${API_BASE_URL}/internal/dashboard/history`, {
             headers: { Authorization: `Bearer ${token}` }
@@ -415,9 +447,22 @@ function MainApp() {
               <Text style={styles.profileEmail}>{user?.primaryEmailAddress?.emailAddress || 'Not signed in'}</Text>
             </View>
             <SignedIn><TouchableOpacity style={styles.authButtonOutline} onPress={() => useAuth().signOut()}><Text style={styles.authButtonTextOutline}>Sign Out</Text></TouchableOpacity></SignedIn>
-            <SignedOut><TouchableOpacity style={styles.authButton}><Text style={styles.authButtonText}>Sign In</Text></TouchableOpacity></SignedOut>
+            <SignedOut><TouchableOpacity style={styles.authButton} onPress={onSignInPress}><Text style={styles.authButtonText}>Sign In with Google</Text></TouchableOpacity></SignedOut>
             <View style={{ height: 100 }} />
           </ScrollView>
+        )}
+
+        {isNavigating && (
+          <View style={styles.navOverlay}>
+            <LinearGradient colors={['#00FFA3', '#00D187']} style={styles.navGradient}>
+              <Navigation size={48} color="#000" />
+              <Text style={styles.navActiveTitle}>Navigation Active</Text>
+              <Text style={styles.navActiveSub}>Following Greenest Route</Text>
+              <TouchableOpacity style={styles.stopButton} onPress={() => setIsNavigating(false)}>
+                <Text style={styles.stopButtonText}>Stop Journey</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
         )}
 
         <View style={styles.bottomNav}>
@@ -493,5 +538,13 @@ const styles = StyleSheet.create({
   authButtonOutline: { borderWidth: 1, borderColor: '#334155', paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
   authButtonTextOutline: { color: '#fff', fontSize: 16, fontWeight: '600' },
   bottomNav: { position: 'absolute', bottom: 30, left: 20, right: 20, height: 70, backgroundColor: '#1e293b', borderRadius: 25, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', borderWidth: 1, borderColor: '#334155', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10 },
-  navItem: { padding: 15 }
+  navItem: { padding: 15 },
+  startJourneyButton: { marginTop: 20, height: 55, borderRadius: 16, overflow: 'hidden' },
+  startJourneyText: { color: '#000', fontSize: 16, fontWeight: '800' },
+  navOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10000 },
+  navGradient: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  navActiveTitle: { color: '#000', fontSize: 32, fontWeight: '900', marginTop: 20 },
+  navActiveSub: { color: 'rgba(0,0,0,0.6)', fontSize: 16, fontWeight: '600', marginTop: 5 },
+  stopButton: { marginTop: 50, backgroundColor: '#000', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 30 },
+  stopButtonText: { color: '#00FFA3', fontSize: 18, fontWeight: '800' }
 });

@@ -344,7 +344,7 @@ async def compare_routes(
                         try:
                             lat, lon = graph_store.graph.get_node_coords(nid)
                             coords.append({"lat": lat, "lon": lon})
-                        except:
+                        except Exception:
                             continue
                     return coords
 

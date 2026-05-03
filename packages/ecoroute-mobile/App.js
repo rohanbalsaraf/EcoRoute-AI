@@ -232,7 +232,7 @@ function MainApp() {
           dest_lon: destCoords.lon,
           vehicles: [selectedVehicle]
         })
-      });
+      }, 30000); // 30s timeout for first-time area ingestion
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Route calculation failed");
@@ -241,20 +241,20 @@ function MainApp() {
       if (!compare) throw new Error(`No data returned for ${selectedVehicle}`);
       if (compare.error) throw new Error(compare.error);
 
-      const mapPath = (coords) => coords.map(c => ({ latitude: c.lat, longitude: c.lon }));
+      const mapPath = (coords) => (coords || []).map(c => ({ latitude: c.lat, longitude: c.lon }));
 
       setRawRoutes({
         eco: {
-          coordinates: mapPath(compare.greenest.path_coords),
-          distance_km: compare.greenest.total_distance_km,
-          duration_min: compare.greenest.total_time_min,
-          carbon_kg: compare.greenest.total_carbon_kg
+          coordinates: mapPath(compare.greenest?.path_coords),
+          distance_km: compare.greenest?.total_distance_km || 0,
+          duration_min: compare.greenest?.total_time_min || 0,
+          carbon_kg: compare.greenest?.total_carbon_kg || 0
         },
         standard: {
-          coordinates: mapPath(compare.fastest.path_coords),
-          distance_km: compare.fastest.total_distance_km,
-          duration_min: compare.fastest.total_time_min,
-          carbon_kg: compare.fastest.total_carbon_kg
+          coordinates: mapPath(compare.fastest?.path_coords),
+          distance_km: compare.fastest?.total_distance_km || 0,
+          duration_min: compare.fastest?.total_time_min || 0,
+          carbon_kg: compare.fastest?.total_carbon_kg || 0
         }
       });
 

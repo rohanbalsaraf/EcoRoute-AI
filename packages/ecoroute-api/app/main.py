@@ -341,8 +341,11 @@ async def compare_routes(
                 def hydrate_path(node_ids):
                     coords = []
                     for nid in node_ids:
-                        lat, lon = graph_store.graph.get_node_coords(nid)
-                        coords.append({"lat": lat, "lon": lon})
+                        try:
+                            lat, lon = graph_store.graph.get_node_coords(nid)
+                            coords.append({"lat": lat, "lon": lon})
+                        except:
+                            continue
                     return coords
 
                 results[vehicle] = {

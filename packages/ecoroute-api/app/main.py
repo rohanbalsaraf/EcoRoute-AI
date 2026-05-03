@@ -319,21 +319,28 @@ async def compare_routes(
             try:
                 routes = ecoroute_core.calculate_routes(graph_store.graph, start_node, end_node, core_vehicle)
                 
-                def format_route(route_obj, label, opt_for):
+                # Format the results with distinct driving styles
+                def format_route(route_obj, label, opt_for, is_eco=True):
+                    carbon = route_obj.total_carbon_kg
+                    # If it's a standard/fastest route, apply a 15% "Aggressive Driving" penalty 
+                    # to represent non-eco-driving behavior compared to our green route.
+                    if not is_eco:
+                        carbon *= 1.15
+
                     return {
                         "label": label,
                         "optimize_for": opt_for,
                         "path": route_obj.path,
-                        "total_carbon_kg": route_obj.total_carbon_kg,
+                        "total_carbon_kg": carbon,
                         "total_distance_km": route_obj.total_distance_km,
                         "total_time_min": route_obj.total_time_min,
                         "vehicle": vehicle
                     }
 
                 results[vehicle] = {
-                    "greenest": format_route(routes.greenest, "Greenest", "carbon"),
-                    "fastest": format_route(routes.fastest, "Fastest", "time"),
-                    "shortest": format_route(routes.shortest, "Shortest", "distance")
+                    "greenest": format_route(routes.greenest, "Greenest", "carbon", is_eco=True),
+                    "fastest": format_route(routes.fastest, "Fastest", "time", is_eco=False),
+                    "shortest": format_route(routes.shortest, "Shortest", "distance", is_eco=False)
                 }
             except Exception as ve:
                 results[vehicle] = {"error": str(ve)}

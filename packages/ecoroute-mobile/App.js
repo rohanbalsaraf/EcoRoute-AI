@@ -68,7 +68,7 @@ const ECO_DRIVING_TIME_PENALTY = 0.08;
 
 // Helper: Fetch with timeout
 async function fetchWithTimeout(resource, options = {}) {
-  const { timeout = 8000 } = options;
+  const { timeout = 20000 } = options; // Increased to 20s for Render stability
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   const response = await fetch(resource, {
@@ -326,33 +326,37 @@ function MainApp() {
 
             <View style={styles.mapContainer}>
               <View style={styles.mapFrame}>
-                {originCoords && destCoords && (
-                  <MapView 
-                    style={styles.map}
-                    region={originCoords && destCoords ? {
-                      latitude: (originCoords.lat + destCoords.lat) / 2,
-                      longitude: (originCoords.lon + destCoords.lon) / 2,
-                      latitudeDelta: Math.abs(originCoords.lat - destCoords.lat) * 2,
-                      longitudeDelta: Math.abs(originCoords.lon - destCoords.lon) * 2,
-                    } : undefined}
-                    customMapStyle={darkMapStyle}
-                  >
-                    {rawRoutes && (
-                      <>
-                        <Polyline 
-                          coordinates={rawRoutes.standard.coordinates}
-                          strokeWidth={4} strokeColor="rgba(255, 255, 255, 0.2)" lineDashPattern={[5, 5]}
-                        />
-                        <Polyline 
-                          coordinates={rawRoutes.eco.coordinates}
-                          strokeWidth={6} strokeColor="#00FFA3"
-                        />
-                        <Marker coordinate={{ latitude: originCoords.lat, longitude: originCoords.lon }} />
-                        <Marker coordinate={{ latitude: destCoords.lat, longitude: destCoords.lon }} />
-                      </>
-                    )}
-                  </MapView>
-                )}
+                <MapView 
+                  style={styles.map}
+                  initialRegion={{
+                    latitude: 18.5285,
+                    longitude: 73.8740,
+                    latitudeDelta: 0.1,
+                    longitudeDelta: 0.1,
+                  }}
+                  region={originCoords && destCoords ? {
+                    latitude: (originCoords.lat + destCoords.lat) / 2,
+                    longitude: (originCoords.lon + destCoords.lon) / 2,
+                    latitudeDelta: Math.abs(originCoords.lat - destCoords.lat) * 2,
+                    longitudeDelta: Math.abs(originCoords.lon - destCoords.lon) * 2,
+                  } : undefined}
+                  customMapStyle={darkMapStyle}
+                >
+                  {rawRoutes && originCoords && destCoords && (
+                    <>
+                      <Polyline 
+                        coordinates={rawRoutes.standard.coordinates}
+                        strokeWidth={4} strokeColor="rgba(255, 255, 255, 0.2)" lineDashPattern={[5, 5]}
+                      />
+                      <Polyline 
+                        coordinates={rawRoutes.eco.coordinates}
+                        strokeWidth={6} strokeColor="#00FFA3"
+                      />
+                      <Marker coordinate={{ latitude: originCoords.lat, longitude: originCoords.lon }} />
+                      <Marker coordinate={{ latitude: destCoords.lat, longitude: destCoords.lon }} />
+                    </>
+                  )}
+                </MapView>
               </View>
             </View>
 

@@ -4,11 +4,31 @@ import time
 import redis
 import sentry_sdk
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, Request, HTTPException
+from fastapi import FastAPI, Depends, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List
-from pydantic import BaseModel
+from typing import List, Dict, Optional
+from .auth import get_current_user, verify_api_key, UserSchema
+
+def save_route_to_history(db: Session, user_id: str, origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float, vehicle: str, routes_data: dict):
+    """Helper to save a search result to the database."""
+    from .models import SavedRoute
+    try:
+        new_saved = SavedRoute(
+            user_id=user_id,
+            origin_lat=origin_lat,
+            origin_lon=origin_lon,
+            dest_lat=dest_lat,
+            dest_lon=dest_lon,
+            vehicle=vehicle,
+            green_co2=str(routes_data["greenest"]["total_carbon_kg"]),
+            green_dist=str(routes_data["greenest"]["total_distance_km"]),
+            green_time=str(routes_data["greenest"]["total_time_min"])
+        )
+        db.add(new_saved)
+        db.commit()
+    except Exception as e:
+        print(f"⚠️ Failed to save history: {e}")
 
 # Initialize Sentry
 SENTRY_DSN = os.getenv("SENTRY_DSN")
@@ -224,25 +244,7 @@ def calculate_route(request: RouteRequest, api_key_data: dict = Depends(verify_a
                 routes_data[r_type]["path_coords"] = hydrate_path(routes_data[r_type]["path"])
 
         # 4. Save to database if user is authenticated
-        try:
-            db: Session = next(get_db())
-            from .models import SavedRoute
-            
-            new_saved = SavedRoute(
-                user_id=api_key_data["user_id"],
-                origin_lat=request.origin_lat,
-                origin_lon=request.origin_lon,
-                dest_lat=request.dest_lat,
-                dest_lon=request.dest_lon,
-                vehicle=request.vehicle,
-                green_co2=str(routes_data["greenest"]["co2_kg"]),
-                green_dist=str(routes_data["greenest"]["distance_km"]),
-                green_time=str(routes_data["greenest"]["time_min"])
-            )
-            db.add(new_saved)
-            db.commit()
-        except Exception as db_err:
-            print(f"⚠️ Failed to save route to history: {db_err}")
+        save_route_to_history(next(get_db()), api_key_data["user_id"], request.origin_lat, request.origin_lon, request.dest_lat, request.dest_lon, request.vehicle, routes_data)
 
         return {
             "origin": {"lat": request.origin_lat, "lon": request.origin_lon, "node_id": start_node},
@@ -253,30 +255,60 @@ def calculate_route(request: RouteRequest, api_key_data: dict = Depends(verify_a
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/v1/routes/compare", dependencies=[Depends(rate_limit)])
-def compare_routes(request: BulkRouteRequest, api_key_data: dict = Depends(verify_api_key)):
+async def get_optional_user_id(
+    authorization: str = Header(None),
+    x_api_key: str = Header(None),
+    db: Session = Depends(get_db)
+) -> Optional[str]:
+    """Resolves user ID if auth is present, otherwise returns None."""
+    # 1. Try API Key
+    if x_api_key:
+        try:
+            from .auth import verify_api_key
+            # verify_api_key usually expects an APIKeyHeader but we can call it manually
+            # or just replicate logic here. Let's replicate for simplicity/speed.
+            import hashlib
+            hashed_token = hashlib.sha256(x_api_key.encode()).hexdigest()
+            from .models import APIKey
+            db_api_key = db.query(APIKey).filter(APIKey.hashed_key == hashed_token, APIKey.is_active).first()
+            if db_api_key:
+                return db_api_key.user_id
+        except:
+            pass
+
+    # 2. Try Clerk Token
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        if token and token != "null" and token != "undefined":
+            try:
+                from .auth import get_jwks, CLERK_ISSUER_URL
+                from jose import jwt
+                jwks = get_jwks()
+                payload = jwt.decode(token, jwks, algorithms=["RS256"], audience=None, issuer=CLERK_ISSUER_URL)
+                return payload.get("sub")
+            except:
+                pass
+                
+    return None
+
+@app.post("/v1/routes/compare")
+async def compare_routes(
+    request: BulkRouteRequest, 
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_optional_user_id)
+):
+    """
+    Analyzes multiple vehicles for the same route.
+    Efficiently uses a single graph lookup to compare impact.
+    Saves the greenest option to history.
+    """
     if not graph_store.graph:
-        raise HTTPException(status_code=503, detail="Routing engine not initialized")
+        raise HTTPException(status_code=503, detail="Routing engine not ready")
 
     try:
-        # 1. On-demand ingestion (same as single route)
+        # 1. Snap coordinates to nodes
         start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
         end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
-        
-        lat_start, lon_start = graph_store.graph.get_node_coords(start_node)
-        lat_end, lon_end = graph_store.graph.get_node_coords(end_node)
-        
-        dist_sq_origin = (lat_start - request.origin_lat)**2 + (lon_start - request.origin_lon)**2
-        dist_sq_dest = (lat_end - request.dest_lat)**2 + (lon_end - request.dest_lon)**2
-        
-        if dist_sq_origin > 0.02 or dist_sq_dest > 0.02:
-            graph_store.update_graph_for_area(
-                request.origin_lat, request.origin_lon,
-                request.dest_lat, request.dest_lon
-            )
-            # Re-snap after update
-            start_node = graph_store.graph.nearest_node(request.origin_lat, request.origin_lon)
-            end_node = graph_store.graph.nearest_node(request.dest_lat, request.dest_lon)
 
         import ecoroute_core
         results = {}
@@ -290,7 +322,7 @@ def compare_routes(request: BulkRouteRequest, api_key_data: dict = Depends(verif
                     return {
                         "label": label,
                         "optimize_for": opt_for,
-                        "path_node_ids": route_obj.path,
+                        "path": route_obj.path,
                         "total_carbon_kg": route_obj.total_carbon_kg,
                         "total_distance_km": route_obj.total_distance_km,
                         "total_time_min": route_obj.total_time_min,
@@ -304,6 +336,12 @@ def compare_routes(request: BulkRouteRequest, api_key_data: dict = Depends(verif
                 }
             except Exception as ve:
                 results[vehicle] = {"error": str(ve)}
+
+        # 3. Save greenest of the first vehicle to history (simplified sync)
+        if user_id and request.vehicles:
+            first_v = request.vehicles[0]
+            if "error" not in results[first_v]:
+                save_route_to_history(db, user_id, request.origin_lat, request.origin_lon, request.dest_lat, request.dest_lon, first_v, results[first_v])
 
         return {
             "origin": {"lat": request.origin_lat, "lon": request.origin_lon},

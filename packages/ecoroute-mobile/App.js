@@ -302,41 +302,33 @@ function MainApp() {
                     placeholder="Destination..."
                     placeholderTextColor="#64748b"
                     value={destination}
-                    onChangeText={(t) => { setDestination(t); fetchSuggestions(t, 'dest'); }}
+                    onChangeText={(t) => { setDestination(t); fetchSuggestions(t, 'destination'); }}
                   />
                 </View>
-                
-                <TouchableOpacity 
-                  style={styles.searchButton}
-                  onPress={handleSearch}
-                  disabled={isSearching}
-                >
-                  <View style={[styles.gradientSearch, { backgroundColor: '#00FFA3' }]}>
-                    {isSearching ? <ActivityIndicator color="#000" size="small" /> : <ArrowRight size={20} color="#000" />}
-                  </View>
+
+                <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+                  <LinearGradient colors={['#00FFA3', '#00D187']} style={styles.gradientSearch}>
+                    {isSearching ? <ActivityIndicator color="#000" /> : <ArrowRight size={20} color="#000" />}
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
 
               {suggestions.length > 0 && (
                 <View style={styles.suggestionsBox}>
-                  {suggestions.map((s, idx) => (
-                    <TouchableOpacity key={idx} style={styles.suggestionItem} onPress={() => handleSelectSuggestion(s)}>
-                      <Text style={styles.suggestionText}>{s.properties.name || s.properties.city}, {s.properties.country}</Text>
+                  {suggestions.map((s, i) => (
+                    <TouchableOpacity key={i} style={styles.suggestionItem} onPress={() => handleSelectSuggestion(s)}>
+                      <Text style={styles.suggestionText}>{s.properties.name || s.properties.city}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.mapContainer}>
-                <View style={styles.mapFrame}>
-                  <MapView
+            <View style={styles.mapContainer}>
+              <View style={styles.mapFrame}>
+                {originCoords && destCoords && (
+                  <MapView 
                     style={styles.map}
-                    initialRegion={{
-                      latitude: 18.52, longitude: 73.85,
-                      latitudeDelta: 0.1, longitudeDelta: 0.1,
-                    }}
                     region={originCoords && destCoords ? {
                       latitude: (originCoords.lat + destCoords.lat) / 2,
                       longitude: (originCoords.lon + destCoords.lon) / 2,
@@ -360,23 +352,21 @@ function MainApp() {
                       </>
                     )}
                   </MapView>
-                </View>
+                )}
               </View>
+            </View>
 
-              <View style={styles.vehicleSelect}>
-                {VEHICLES.map(v => (
-                  <TouchableOpacity key={v.id} style={[styles.vehicleCard, selectedVehicle === v.id && { borderColor: v.color }]} onPress={() => setSelectedVehicle(v.id)}>
-                    <Text style={[styles.vehicleLabel, selectedVehicle === v.id && { color: v.color }]}>{v.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <View style={styles.vehicleSelect}>
+              {VEHICLES.map(v => (
+                <TouchableOpacity key={v.id} style={[styles.vehicleCard, selectedVehicle === v.id && { borderColor: v.color }]} onPress={() => setSelectedVehicle(v.id)}>
+                  <Text style={[styles.vehicleLabel, selectedVehicle === v.id && { color: v.color }]}>{v.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-              {rawRoutes && (
-                <View style={styles.resultsContainer}>
-                  <TouchableOpacity 
-                    style={[styles.routeCard, selectedRouteType === 'eco' && styles.routeCardActive]}
-                    onPress={() => setSelectedRouteType('eco')}
-                  >
+            {rawRoutes && (
+              <ScrollView style={styles.resultsContainer}>
+                <TouchableOpacity style={[styles.routeCard, styles.routeCardActive]}>
                     <View style={styles.routeHeader}>
                       <Text style={styles.routeType}>Eco Route</Text>
                       <View style={styles.trafficBadge}>
@@ -386,64 +376,78 @@ function MainApp() {
                       <View style={styles.badge}><Text style={styles.badgeText}>-{co2SavingPercent}% CO2</Text></View>
                     </View>
                     <Text style={styles.routeStats}>{rawRoutes.eco.distance_km.toFixed(1)}km • {rawRoutes.eco.duration_min.toFixed(0)} min</Text>
-                    <Text style={styles.routeCarbon}>{rawRoutes.eco.carbon_kg.toFixed(3)} kg CO2</Text>
-                  </TouchableOpacity>
-
+                    <Text style={styles.routeCarbon}>{rawRoutes.eco.carbon_kg.toFixed(2)} kg CO2 emitted</Text>
+                  
                   <TouchableOpacity 
-                    style={[styles.routeCard, selectedRouteType === 'standard' && styles.routeCardActive]}
-                    onPress={() => setSelectedRouteType('standard')}
+                    style={styles.startJourneyButton}
+                    onPress={() => setIsNavigating(true)}
                   >
-                    <Text style={styles.routeType}>Standard Route</Text>
-                    <Text style={styles.routeStats}>{rawRoutes.standard.distance_km.toFixed(1)}km • {rawRoutes.standard.duration_min.toFixed(0)} min</Text>
-                    <Text style={styles.routeCarbon}>{rawRoutes.standard.carbon_kg.toFixed(3)} kg CO2</Text>
+                    <View style={[styles.gradientSearch, { backgroundColor: '#00FFA3', borderRadius: 16 }]}>
+                      <Text style={styles.startJourneyText}>Start Green Journey</Text>
+                    </View>
                   </TouchableOpacity>
-                </View>
-              )}
-              <View style={{ height: 100 }} />
-            </ScrollView>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.routeCard}>
+                  <View style={styles.routeHeader}>
+                    <Text style={styles.routeType}>Standard Route</Text>
+                  </View>
+                  <Text style={styles.routeStats}>{rawRoutes.standard.distance_km.toFixed(1)}km • {rawRoutes.standard.duration_min.toFixed(0)} min</Text>
+                  <Text style={[styles.routeCarbon, { color: '#64748b' }]}>{rawRoutes.standard.carbon_kg.toFixed(2)} kg CO2 emitted</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
           </>
         )}
 
         {activeTab === 'dashboard' && (
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.tabContent}>
+          <ScrollView style={styles.tabContent}>
             <Text style={styles.tabTitle}>Impact</Text>
             <View style={styles.statsCard}>
-              <Text style={styles.statLarge}>{stats.total_carbon_saved || "0.0"} kg</Text>
-              <Text style={styles.statLargeLabel}>Total CO2 Saved</Text>
+              <Text style={styles.statLarge}>{stats.total_carbon_saved}</Text>
+              <Text style={styles.statLargeLabel}>kg CO2 Saved</Text>
               <View style={styles.divider} />
-              <Text style={styles.statSubText}>{stats.api_calls || 0} API Calls • {stats.tier || "Free"} Tier</Text>
+              <Text style={styles.statSubText}>{stats.api_calls} Green Routes Optimized</Text>
+              <Text style={[styles.statSubText, { marginTop: 5 }]}>Plan: {stats.tier}</Text>
             </View>
 
             <View style={styles.historySection}>
               <Text style={styles.sectionTitle}>Recent Journeys</Text>
-              {history.length > 0 ? history.map((item) => (
-                <View key={item.id} style={styles.historyItem}>
+              {history.length > 0 ? history.map((item, i) => (
+                <View key={i} style={styles.historyItem}>
                   <View style={styles.historyInfo}>
-                    <Text style={styles.historyRoute}>{item.vehicle.toUpperCase()} Journey</Text>
+                    <Text style={styles.historyRoute}>{item.origin} → {item.destination}</Text>
                     <Text style={styles.historyDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
                   </View>
-                  <Text style={styles.historySaving}>-{parseFloat(item.green_co2).toFixed(2)}kg</Text>
+                  <Text style={styles.historySaving}>-{item.saved_co2}kg</Text>
                 </View>
               )) : (
                 <Text style={styles.emptyText}>No journeys saved yet.</Text>
               )}
             </View>
-            <View style={{ height: 100 }} />
           </ScrollView>
         )}
 
         {activeTab === 'profile' && (
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.tabContent}>
+          <View style={styles.tabContent}>
             <Text style={styles.tabTitle}>Account</Text>
-            <View style={styles.profileSection}>
-              <View style={styles.avatarLarge}><Leaf size={40} color="#00FFA3" /></View>
-              <Text style={styles.profileName}>{user?.fullName || 'Guest User'}</Text>
-              <Text style={styles.profileEmail}>{user?.primaryEmailAddress?.emailAddress || 'Not signed in'}</Text>
-            </View>
-            <SignedIn><TouchableOpacity style={styles.authButtonOutline} onPress={() => useAuth().signOut()}><Text style={styles.authButtonTextOutline}>Sign Out</Text></TouchableOpacity></SignedIn>
-            <SignedOut><TouchableOpacity style={styles.authButton} onPress={onSignInPress}><Text style={styles.authButtonText}>Sign In with Google</Text></TouchableOpacity></SignedOut>
-            <View style={{ height: 100 }} />
-          </ScrollView>
+            
+            {!isSignedIn ? (
+              <View style={styles.profileSection}>
+                <View style={styles.avatarLarge}><Leaf size={40} color="#00FFA3" /></View>
+                <Text style={[styles.profileName, { marginBottom: 30 }]}>Join the Movement</Text>
+                <TouchableOpacity style={[styles.authButton, { width: '100%' }]} onPress={onSignInPress}>
+                  <Text style={styles.authButtonText}>Sign In with Google</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.profileSection}>
+                <View style={styles.avatarLarge}><Leaf size={40} color="#00FFA3" /></View>
+                <Text style={styles.profileName}>{user?.fullName || 'Eco Traveler'}</Text>
+                <Text style={styles.profileEmail}>{user?.primaryEmailAddress?.emailAddress}</Text>
+              </View>
+            )}
+          </View>
         )}
 
         {isNavigating && (

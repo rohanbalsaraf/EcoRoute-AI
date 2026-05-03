@@ -6,8 +6,29 @@ from .osm_ingester import ingest_area
 
 GRAPH_FILE = "/tmp/graph_cache.json"
 
+class Node:
+    def __init__(self, id, lat, lon):
+        self.id = id
+        self.lat = lat
+        self.lon = lon
+
+class Edge:
+    def __init__(self, to, distance_km, speed_limit_kmh, current_speed_kmh, gradient_pct, num_signals):
+        self.to = to
+        self.distance_km = distance_km
+        self.speed_limit_kmh = speed_limit_kmh
+        self.current_speed_kmh = current_speed_kmh
+        self.gradient_pct = gradient_pct
+        self.num_signals = num_signals
+
 def get_graph_from_data(nodes, adjacency):
-    return ecoroute_core.PyRoadGraph(nodes, adjacency)
+    py_nodes = [Node(n['id'], n['lat'], n['lon']) for n in nodes]
+    py_adjacency = []
+    for adj in adjacency:
+        py_adj = [Edge(e['to'], e['distance_km'], e['speed_limit_kmh'], e['current_speed_kmh'], e['gradient_pct'], e['num_signals']) for e in adj]
+        py_adjacency.append(py_adj)
+    
+    return ecoroute_core.PyRoadGraph(py_nodes, py_adjacency)
 
 def init_graph():
     global graph

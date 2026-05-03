@@ -7,8 +7,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List, Dict, Optional
-from .auth import get_current_user, verify_api_key, UserSchema
+from typing import List, Optional
+from pydantic import BaseModel
 
 def save_route_to_history(db: Session, user_id: str, origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float, vehicle: str, routes_data: dict):
     """Helper to save a search result to the database."""
@@ -264,16 +264,13 @@ async def get_optional_user_id(
     # 1. Try API Key
     if x_api_key:
         try:
-            from .auth import verify_api_key
-            # verify_api_key usually expects an APIKeyHeader but we can call it manually
-            # or just replicate logic here. Let's replicate for simplicity/speed.
             import hashlib
             hashed_token = hashlib.sha256(x_api_key.encode()).hexdigest()
             from .models import APIKey
             db_api_key = db.query(APIKey).filter(APIKey.hashed_key == hashed_token, APIKey.is_active).first()
             if db_api_key:
                 return db_api_key.user_id
-        except:
+        except Exception:
             pass
 
     # 2. Try Clerk Token
@@ -286,7 +283,7 @@ async def get_optional_user_id(
                 jwks = get_jwks()
                 payload = jwt.decode(token, jwks, algorithms=["RS256"], audience=None, issuer=CLERK_ISSUER_URL)
                 return payload.get("sub")
-            except:
+            except Exception:
                 pass
                 
     return None

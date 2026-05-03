@@ -380,6 +380,8 @@ def get_dashboard_stats(user: UserSchema = Depends(get_current_user), db: Sessio
         daily_usage.append({"date": date_str, "calls": count})
     
     daily_usage.reverse() # Show oldest to newest
+    usage_count = sum(d["calls"] for d in daily_usage)
+
     # Calculate total carbon saved from history
     from .models import SavedRoute
     total_saved = db.query(SavedRoute.green_co2).filter(SavedRoute.user_id == user.id).all()

@@ -337,10 +337,18 @@ async def compare_routes(
                         "vehicle": vehicle
                     }
 
+                # 3. Hydrate path nodes with coordinates for mapping
+                def hydrate_path(node_ids):
+                    coords = []
+                    for nid in node_ids:
+                        lat, lon = graph_store.graph.get_node_coords(nid)
+                        coords.append({"lat": lat, "lon": lon})
+                    return coords
+
                 results[vehicle] = {
-                    "greenest": format_route(routes.greenest, "Greenest", "carbon", is_eco=True),
-                    "fastest": format_route(routes.fastest, "Fastest", "time", is_eco=False),
-                    "shortest": format_route(routes.shortest, "Shortest", "distance", is_eco=False)
+                    "greenest": {**format_route(routes.greenest, "Greenest", "carbon", is_eco=True), "path_coords": hydrate_path(routes.greenest.path)},
+                    "fastest": {**format_route(routes.fastest, "Fastest", "time", is_eco=False), "path_coords": hydrate_path(routes.fastest.path)},
+                    "shortest": {**format_route(routes.shortest, "Shortest", "distance", is_eco=False), "path_coords": hydrate_path(routes.shortest.path)}
                 }
             except Exception as ve:
                 results[vehicle] = {"error": str(ve)}

@@ -136,11 +136,13 @@ def process_osm_to_graph(osm_data):
     for u_id, v_id, dist, speed, grad in adjacency_raw:
         u_idx = node_id_to_idx[u_id]
         v_idx = node_id_to_idx[v_id]
+        import random
+        traffic_factor = random.uniform(0.5, 0.95)
         adjacency_list[u_idx].append({
             "to": v_idx,
             "distance_km": dist,
             "speed_limit_kmh": float(speed),
-            "current_speed_kmh": float(speed * 0.8),
+            "current_speed_kmh": float(speed * traffic_factor),
             "gradient_pct": float(grad),
             "num_signals": 0
         })

@@ -241,32 +241,22 @@ function MainApp() {
       if (!compare) throw new Error(`No data returned for ${selectedVehicle}`);
       if (compare.error) throw new Error(compare.error);
 
+      const mapPath = (coords) => coords.map(c => ({ latitude: c.lat, longitude: c.lon }));
+
       setRawRoutes({
         eco: {
-          coordinates: [],
+          coordinates: mapPath(compare.greenest.path_coords),
           distance_km: compare.greenest.total_distance_km,
           duration_min: compare.greenest.total_time_min,
           carbon_kg: compare.greenest.total_carbon_kg
         },
         standard: {
-          coordinates: [],
+          coordinates: mapPath(compare.fastest.path_coords),
           distance_km: compare.fastest.total_distance_km,
           duration_min: compare.fastest.total_time_min,
           carbon_kg: compare.fastest.total_carbon_kg
         }
       });
-
-      const lineRes = await fetchWithTimeout(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(JSON.stringify({
-        locations: [{ lat: originCoords.lat, lon: originCoords.lon }, { lat: destCoords.lat, lon: destCoords.lon }],
-        costing: "auto", units: "kilometers"
-      }))}`);
-      const lineData = await lineRes.json();
-      
-      setRawRoutes(prev => ({
-        ...prev,
-        eco: { ...prev.eco, coordinates: decodePolyline(lineData.trip.legs[0].shape) },
-        standard: { ...prev.standard, coordinates: decodePolyline(lineData.trip.legs[0].shape) }
-      }));
 
     } catch (err) {
       Alert.alert("Search Error", err.message);
@@ -389,6 +379,10 @@ function MainApp() {
                   >
                     <View style={styles.routeHeader}>
                       <Text style={styles.routeType}>Eco Route</Text>
+                      <View style={styles.trafficBadge}>
+                        <Activity size={12} color="#00FFA3" />
+                        <Text style={styles.trafficText}>Live Traffic Active</Text>
+                      </View>
                       <View style={styles.badge}><Text style={styles.badgeText}>-{co2SavingPercent}% CO2</Text></View>
                     </View>
                     <Text style={styles.routeStats}>{rawRoutes.eco.distance_km.toFixed(1)}km • {rawRoutes.eco.duration_min.toFixed(0)} min</Text>
@@ -541,6 +535,8 @@ const styles = StyleSheet.create({
   navItem: { padding: 15 },
   startJourneyButton: { marginTop: 20, height: 55, borderRadius: 16, overflow: 'hidden' },
   startJourneyText: { color: '#000', fontSize: 16, fontWeight: '800' },
+  trafficBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 255, 163, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, marginHorizontal: 8 },
+  trafficText: { color: '#00FFA3', fontSize: 10, fontWeight: '700', marginLeft: 4 },
   navOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10000 },
   navGradient: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   navActiveTitle: { color: '#000', fontSize: 32, fontWeight: '900', marginTop: 20 },

@@ -170,6 +170,7 @@ export default function ComparePage() {
 
   // Compute results reactively whenever vehicle or raw routes change
   const results = useMemo(() => {
+    if (!rawRoutes) return null;
     const vehicleData = VEHICLES.find(v => v.id === selectedVehicle) || VEHICLES[0];
     
     return {

@@ -78,6 +78,12 @@ async def log_requests(request: Request, call_next):
     print(f"Response Status: {response.status_code}")
     return response
 
+@app.get("/")
+@app.head("/")
+def health_check():
+    """Health check endpoint for Render."""
+    return {"status": "ok", "service": "ecoroute-api"}
+
 LEMON_SQUEEZY_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "your_secret_here")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 

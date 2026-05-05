@@ -60,11 +60,23 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False, # Must be False if origins is "*"
+    allow_origins=[
+        "http://localhost:3000",
+        "https://eco-route-ai-amber.vercel.app",
+        "https://eco-route-ai-amber-rohanbalsarafs-projects.vercel.app",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    origin = request.headers.get("origin")
+    print(f"Incoming Request: {request.method} {request.url.path} | Origin: {origin}")
+    response = await call_next(request)
+    print(f"Response Status: {response.status_code}")
+    return response
 
 LEMON_SQUEEZY_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "your_secret_here")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")

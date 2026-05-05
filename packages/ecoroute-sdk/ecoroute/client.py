@@ -21,6 +21,8 @@ from .models import (
     VehicleType,
     Waypoint,
     WeatherData,
+    OptimizeFor,
+    Route
 )
 from .data_sources import AQIClient, GeocodingClient, OSRMClient, WeatherClient
 from .optimizer import Optimizer, PyEdge, PyNode

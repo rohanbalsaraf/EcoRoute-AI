@@ -80,8 +80,8 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/")
 @app.head("/")
-def health_check():
-    """Health check endpoint for Render."""
+def ping():
+    """Simple health check endpoint for Render."""
     return {"status": "ok", "service": "ecoroute-api"}
 
 LEMON_SQUEEZY_WEBHOOK_SECRET = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "your_secret_here")
@@ -294,7 +294,9 @@ async def get_optional_user_id(
         token = authorization.split(" ")[1]
         if token and token != "null" and token != "undefined":
             try:
-                from .auth import get_jwks, CLERK_ISSUER_URL
+                from .auth import get_jwks
+                from jose import jwt
+                jwks = get_jwks()
                 payload = jwt.decode(
                     token, 
                     jwks, 

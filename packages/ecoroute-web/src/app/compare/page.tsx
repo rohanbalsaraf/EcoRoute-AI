@@ -52,40 +52,6 @@ function decodePolyline(encoded: string): [number, number][] {
   return coords;
 }
 
-// Fetch a single Valhalla route with specific costing options
-async function fetchValhallaWithCosting(
-  originLat: number, originLon: number,
-  destLat: number, destLon: number,
-  costingOptions: object
-): Promise<RouteGeometry> {
-  const body = JSON.stringify({
-    locations: [
-      { lat: originLat, lon: originLon },
-      { lat: destLat, lon: destLon }
-    ],
-    costing: "auto",
-    costing_options: { auto: costingOptions },
-    units: "kilometers"
-  });
-
-  const res = await fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(body)}`, {
-    signal: AbortSignal.timeout(20000)
-  });
-
-  if (!res.ok) throw new Error(`Routing service error (${res.status})`);
-  const data = await res.json();
-  
-  if (!data.trip?.legs?.length) {
-    throw new Error('Could not find a driving route.');
-  }
-
-  return {
-    coordinates: decodePolyline(data.trip.legs[0].shape),
-    distance_km: data.trip.summary.length,
-    duration_min: data.trip.summary.time / 60,
-  };
-}
-
 // Fetch routes from EcoRoute API
 async function fetchEcoRouteCompare(
   origin: { lat: number; lon: number },
@@ -139,22 +105,6 @@ async function fetchEcoRouteCompare(
   };
 }
 
-// Fallback: OSRM (single route)
-async function fetchOSRMRoute(
-  originLat: number, originLon: number,
-  destLat: number, destLon: number
-): Promise<RouteGeometry> {
-  const url = `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&alternatives=true`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!res.ok) throw new Error(`OSRM error (${res.status})`);
-  const data = await res.json();
-  if (data.code !== 'Ok' || !data.routes?.length) throw new Error('OSRM: no route found');
-  return {
-    coordinates: data.routes[0].geometry.coordinates,
-    distance_km: data.routes[0].distance / 1000,
-    duration_min: data.routes[0].duration / 60,
-  };
-}
 
 export default function ComparePage() {
   const { getToken, isSignedIn } = useAuth();

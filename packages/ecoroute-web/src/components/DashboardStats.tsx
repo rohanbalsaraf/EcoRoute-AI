@@ -25,7 +25,7 @@ export default function DashboardStats() {
     const fetchStats = async () => {
       try {
         const token = await getToken();
-        const fetchUrl = `${API_URL}/internal/dashboard/stats`;
+        const fetchUrl = `${API_URL}/internal/dashboard/usage`;
         const headers: any = { 'Content-Type': 'application/json' };
         if (token && typeof token === 'string' && token.length > 10) {
             headers['Authorization'] = `Bearer ${token}`;
@@ -54,7 +54,7 @@ export default function DashboardStats() {
         }
       } catch (error: any) {
         console.error("Failed to fetch stats:", error);
-        setDebugInfo(`${error.message} | Target: ${API_URL}/internal/dashboard/stats`);
+        setDebugInfo(`${error.message} | Target: ${API_URL}/internal/dashboard/usage`);
       } finally {
         setLoading(false);
       }

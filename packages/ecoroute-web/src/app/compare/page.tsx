@@ -27,6 +27,7 @@ interface RouteGeometry {
   coordinates: [number, number][];
   distance_km: number;
   duration_min: number;
+  carbon_kg: number;
 }
 
 // Store raw route data separately from computed results

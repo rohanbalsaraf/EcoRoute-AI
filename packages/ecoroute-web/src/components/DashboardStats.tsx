@@ -19,15 +19,19 @@ export default function DashboardStats() {
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const API_URL = rawApiUrl.replace(/\/$/, "");
+  const API_URL = rawApiUrl.trim().replace(/\/$/, "");
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const token = await getToken();
-        const res = await fetch(`${API_URL}/internal/dashboard/stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const fetchUrl = `${API_URL}/internal/dashboard/stats`;
+        const headers: any = { 'Content-Type': 'application/json' };
+        if (token && typeof token === 'string' && token.length > 10) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(fetchUrl, { headers });
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -43,11 +47,11 @@ export default function DashboardStats() {
             });
           }
         } else {
-          setDebugInfo(`Error ${res.status}: ${res.statusText}`);
+          setDebugInfo(`Error ${res.status}: ${res.statusText} | URL: ${fetchUrl}`);
         }
       } catch (error: any) {
         console.error("Failed to fetch stats:", error);
-        setDebugInfo(error.message || "Connection failed");
+        setDebugInfo(`${error.message} | Target: ${API_URL}/internal/dashboard/stats`);
       } finally {
         setLoading(false);
       }

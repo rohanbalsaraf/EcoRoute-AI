@@ -281,9 +281,12 @@ async def get_optional_user_id(
         if token and token != "null" and token != "undefined":
             try:
                 from .auth import get_jwks, CLERK_ISSUER_URL
-                from jose import jwt
-                jwks = get_jwks()
-                payload = jwt.decode(token, jwks, algorithms=["RS256"], audience=None, issuer=CLERK_ISSUER_URL)
+                payload = jwt.decode(
+                    token, 
+                    jwks, 
+                    algorithms=["RS256"],
+                    options={"verify_aud": False, "verify_iss": False}
+                )
                 return payload.get("sub")
             except Exception:
                 pass

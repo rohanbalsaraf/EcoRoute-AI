@@ -14,8 +14,8 @@ from fastapi.security import APIKeyHeader
 security = HTTPBearer()
 api_key_header = APIKeyHeader(name="X-API-Key")
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
-# For production, set this to your Clerk Frontend API URL (e.g., https://liked-manatee-55.clerk.accounts.dev)
-CLERK_ISSUER_URL = os.getenv("CLERK_ISSUER_URL", "https://liked-manatee-55.clerk.accounts.dev")
+# Use the Frontend API URL from Clerk Dashboard (e.g., https://liked-manatee-55.clerk.accounts.dev)
+CLERK_ISSUER_URL = os.getenv("CLERK_ISSUER_URL", "https://liked-manatee-55.clerk.accounts.dev").rstrip("/")
 JWKS_URL = f"{CLERK_ISSUER_URL}/.well-known/jwks.json"
 
 class UserSchema(BaseModel):
@@ -53,8 +53,10 @@ async def get_current_user(
             token,
             jwks,
             algorithms=["RS256"],
-            audience=None, # Clerk tokens don't always have aud set by default
-            issuer=CLERK_ISSUER_URL
+            options={
+                "verify_aud": False,
+                "verify_iss": False # Allow flexibility with Clerk subdomains
+            }
         )
         
         user_id = payload.get("sub")

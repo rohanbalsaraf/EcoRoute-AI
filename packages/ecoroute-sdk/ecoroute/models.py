@@ -124,15 +124,16 @@ class RouteSegment(BaseModel):
 # Route — one complete route option
 # ----------------------------------------------------------------
 class Route(BaseModel):
-    label: str  # "Greenest" | "Fastest" | "Shortest"
-    optimize_for: OptimizeFor
-    path_node_ids: list[int]
+    label: Optional[str] = None  # "Greenest" | "Fastest" | "Shortest"
+    optimize_for: Optional[OptimizeFor] = None
+    path: list[int] = Field(alias="path_node_ids", default_factory=list) # Support both aliases
+    path_coords: list[Coordinate] = Field(default_factory=list)
     waypoints: list[Waypoint] = Field(default_factory=list)
     segments: list[RouteSegment] = Field(default_factory=list)
     total_distance_km: float
     total_time_min: float
     total_carbon_kg: float
-    vehicle: VehicleType
+    vehicle: Optional[VehicleType] = None
 
     @computed_field  # type: ignore
     @property

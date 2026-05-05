@@ -122,13 +122,26 @@ class EcoRouteClient:
                         if "error" in res:
                             continue
                         
+                        # Helper to build Route objects from API sub-dicts
+                        def build_route(r_data: dict, label: str, opt: OptimizeFor):
+                            return Route(
+                                label=label,
+                                optimize_for=opt,
+                                path=r_data["path"],
+                                path_coords=[Coordinate(lat=c["lat"], lon=c["lon"]) for c in r_data["path_coords"]],
+                                total_distance_km=r_data["total_distance_km"],
+                                total_time_min=r_data["total_time_min"],
+                                total_carbon_kg=r_data["total_carbon_kg"],
+                                vehicle=v_type
+                            )
+
                         results[v_type] = RouteResponse(
                             origin=origin_wp,
                             destination=dest_wp,
                             vehicle=v_type,
-                            greenest=res["greenest"],
-                            fastest=res["fastest"],
-                            shortest=res["shortest"]
+                            greenest=build_route(res["greenest"], "Greenest", OptimizeFor.CARBON),
+                            fastest=build_route(res["fastest"], "Fastest", OptimizeFor.TIME),
+                            shortest=build_route(res["shortest"], "Shortest", OptimizeFor.DISTANCE)
                         )
                     return results
                 return {}

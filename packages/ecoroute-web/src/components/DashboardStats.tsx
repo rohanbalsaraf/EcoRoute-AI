@@ -25,14 +25,14 @@ export default function DashboardStats() {
     const fetchStats = async () => {
       try {
         const token = await getToken();
-        const fetchUrl = `${API_URL}/internal/dashboard/usage`;
+        const fetchUrl = `${API_URL}/api/v1/profile/limits`;
         const headers: any = { 'Content-Type': 'application/json' };
         if (token && typeof token === 'string' && token.length > 10) {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
         const res = await fetch(fetchUrl, { 
-            method: 'POST',
+            method: 'GET',
             headers 
         });
         if (res.ok) {
@@ -54,7 +54,7 @@ export default function DashboardStats() {
         }
       } catch (error: any) {
         console.error("Failed to fetch stats:", error);
-        setDebugInfo(`${error.message} | Target: ${API_URL}/internal/dashboard/usage`);
+        setDebugInfo(`${error.message} | Target: ${API_URL}/api/v1/profile/limits`);
       } finally {
         setLoading(false);
       }

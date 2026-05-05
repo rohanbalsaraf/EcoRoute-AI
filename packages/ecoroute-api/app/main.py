@@ -389,7 +389,7 @@ async def compare_routes(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/internal/dashboard/usage", dependencies=[Depends(get_current_user)])
+@app.get("/api/v1/profile/limits", dependencies=[Depends(get_current_user)])
 def get_dashboard_stats(user: UserSchema = Depends(get_current_user), db: Session = Depends(get_db)):
     """Internal endpoint used by the Next.js frontend to show user's API usage."""
     

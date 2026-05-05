@@ -16,6 +16,7 @@ export default function DashboardStats() {
   const { getToken } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const API_URL = rawApiUrl.replace(/\/$/, "");
@@ -41,9 +42,12 @@ export default function DashboardStats() {
               });
             });
           }
+        } else {
+          setDebugInfo(`Error ${res.status}: ${res.statusText}`);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to fetch stats:", error);
+        setDebugInfo(error.message || "Connection failed");
       } finally {
         setLoading(false);
       }
@@ -67,15 +71,28 @@ export default function DashboardStats() {
           <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 17c-.77 1.333.192 3 1.732 3z"></path></svg>
         </div>
         <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Analytics Unavailable</h3>
-        <p className="text-sm text-[var(--text-secondary)] max-w-xs mb-6">
-          We couldn't connect to the analytics engine. Please check your API configuration or try again.
+        <p className="text-sm text-[var(--text-secondary)] max-w-xs mb-2">
+          We couldn't connect to the analytics engine.
         </p>
-        <button 
-          onClick={() => window.location.reload()}
-          className="btn-glass py-2 px-6 text-xs font-bold hover:bg-red-500/10"
-        >
-          Retry Connection
-        </button>
+        {debugInfo && (
+          <p className="text-[10px] font-mono text-red-400/70 mb-6 bg-red-500/5 px-2 py-1 rounded">
+            Diagnostic: {debugInfo}
+          </p>
+        )}
+        <div className="flex gap-4">
+            <button 
+                onClick={() => window.location.reload()}
+                className="btn-glass py-2 px-6 text-xs font-bold hover:bg-red-500/10"
+            >
+                Retry
+            </button>
+            <a 
+                href="/status"
+                className="btn-glass py-2 px-6 text-xs font-bold border-none text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+                System Status
+            </a>
+        </div>
       </div>
     );
   }

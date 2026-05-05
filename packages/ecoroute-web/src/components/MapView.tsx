@@ -132,7 +132,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     const ecoColor = isDark ? '#00FFA3' : '#059669'; // Darker green for light mode
     const stdColor = isDark ? '#F97316' : '#EA580C'; // Darker orange for light mode
     
-    // Standard route (underneath)
+    // Standard route (underneath, dashed)
     if (!map.current.getSource('std-route')) {
       map.current.addSource('std-route', {
         type: 'geojson',
@@ -140,23 +140,22 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       });
     }
     
-    // Clear existing layers if they exist (to avoid duplicates during theme switch)
-    ['std-route-glow', 'std-route-line', 'eco-route-glow', 'eco-route-line'].forEach(id => {
+    ['std-route-line', 'eco-route-glow', 'eco-route-line'].forEach(id => {
       if (map.current?.getLayer(id)) map.current.removeLayer(id);
     });
 
     map.current.addLayer({
-      id: 'std-route-glow', type: 'line', source: 'std-route',
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': stdColor, 'line-width': 14, 'line-opacity': isDark ? 0.15 : 0.2, 'line-blur': 8 }
-    });
-    map.current.addLayer({
       id: 'std-route-line', type: 'line', source: 'std-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': stdColor, 'line-width': 8, 'line-opacity': 0.85 }
+      paint: { 
+        'line-color': isDark ? '#64748b' : '#94a3b8', 
+        'line-width': 4, 
+        'line-opacity': 0.6,
+        'line-dasharray': [2, 2] 
+      }
     });
 
-    // Eco route (on top)
+    // Eco route (on top, solid glow)
     if (!map.current.getSource('eco-route')) {
       map.current.addSource('eco-route', {
         type: 'geojson',
@@ -166,12 +165,12 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     map.current.addLayer({
       id: 'eco-route-glow', type: 'line', source: 'eco-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': ecoColor, 'line-width': 14, 'line-opacity': isDark ? 0.15 : 0.2, 'line-blur': 8 }
+      paint: { 'line-color': '#00FFA3', 'line-width': 12, 'line-opacity': 0.2, 'line-blur': 8 }
     });
     map.current.addLayer({
       id: 'eco-route-line', type: 'line', source: 'eco-route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': ecoColor, 'line-width': 8, 'line-opacity': 0.95 }
+      paint: { 'line-color': '#00FFA3', 'line-width': 6, 'line-opacity': 1.0 }
     });
 
     // Markers
@@ -244,13 +243,12 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     if (!map.current || !mapReady.current) return;
     const isEco = selectedRoute === "eco";
     try {
-      map.current.setPaintProperty('eco-route-line', 'line-width', isEco ? 6 : 3);
-      map.current.setPaintProperty('eco-route-line', 'line-opacity', isEco ? 1 : 0.4);
-      map.current.setPaintProperty('eco-route-glow', 'line-opacity', isEco ? 0.2 : 0.05);
+      map.current.setPaintProperty('eco-route-line', 'line-width', isEco ? 8 : 4);
+      map.current.setPaintProperty('eco-route-line', 'line-opacity', isEco ? 1 : 0.3);
+      map.current.setPaintProperty('eco-route-glow', 'line-opacity', isEco ? 0.25 : 0);
       
-      map.current.setPaintProperty('std-route-line', 'line-width', !isEco ? 6 : 3);
-      map.current.setPaintProperty('std-route-line', 'line-opacity', !isEco ? 1 : 0.4);
-      map.current.setPaintProperty('std-route-glow', 'line-opacity', !isEco ? 0.2 : 0.05);
+      map.current.setPaintProperty('std-route-line', 'line-width', !isEco ? 8 : 4);
+      map.current.setPaintProperty('std-route-line', 'line-opacity', !isEco ? 0.9 : 0.3);
     } catch (e) {
       // Layers might be missing during style transition
     }

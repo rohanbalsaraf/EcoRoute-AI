@@ -85,50 +85,57 @@ async function fetchValhallaWithCosting(
   };
 }
 
-// Fetch dual routes: eco-friendly (shortest distance) vs standard (fastest)
-async function fetchDualRoutes(
-  originLat: number, originLon: number,
-  destLat: number, destLon: number
-): Promise<{ eco: RouteGeometry; standard: RouteGeometry }> {
-  const locations = [
-    { lat: originLat, lon: originLon },
-    { lat: destLat, lon: destLon }
-  ];
+// Fetch routes from EcoRoute API
+async function fetchEcoRouteCompare(
+  origin: { lat: number; lon: number },
+  dest: { lat: number; lon: number },
+  vehicle: string,
+  token: string | null,
+  apiUrl: string
+) {
+  const headers: any = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // Route A: shortest distance (eco — less fuel burned)
-  const bodyA = JSON.stringify({ locations, costing: "auto_shorter", units: "kilometers" });
-  // Route B: fastest time (standard — uses highways)
-  const bodyB = JSON.stringify({ locations, costing: "auto", units: "kilometers" });
+  const res = await fetch(`${apiUrl}/v1/routes/compare`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      origin_lat: origin.lat,
+      origin_lon: origin.lon,
+      dest_lat: dest.lat,
+      dest_lon: dest.lon,
+      vehicles: [vehicle]
+    }),
+    signal: AbortSignal.timeout(30000) // 30s for area ingestion
+  });
 
-  const [resA, resB] = await Promise.all([
-    fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(bodyA)}`, { signal: AbortSignal.timeout(20000) }),
-    fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(bodyB)}`, { signal: AbortSignal.timeout(20000) }),
-  ]);
-
-  if (!resA.ok || !resB.ok) throw new Error(`Routing error (${resA.status}/${resB.status})`);
-  const [dataA, dataB] = await Promise.all([resA.json(), resB.json()]);
-
-  if (!dataA.trip?.legs?.length || !dataB.trip?.legs?.length) {
-    throw new Error('Could not find driving routes.');
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `API error (${res.status})`);
   }
 
-  const routeA: RouteGeometry = {
-    coordinates: decodePolyline(dataA.trip.legs[0].shape),
-    distance_km: dataA.trip.summary.length,
-    duration_min: dataA.trip.summary.time / 60,
-  };
-  const routeB: RouteGeometry = {
-    coordinates: decodePolyline(dataB.trip.legs[0].shape),
-    distance_km: dataB.trip.summary.length,
-    duration_min: dataB.trip.summary.time / 60,
-  };
-
-  // The shorter-distance route is eco (less fuel), the faster one is standard
-  if (routeA.distance_km <= routeB.distance_km) {
-    return { eco: routeA, standard: routeB };
-  } else {
-    return { eco: routeB, standard: routeA };
+  const data = await res.json();
+  const compare = data.comparisons[vehicle];
+  
+  if (!compare || compare.error) {
+    throw new Error(compare?.error || "No route found for this vehicle type.");
   }
+
+  // Map to internal format
+  return {
+    eco: {
+      coordinates: compare.greenest.path_coords.map((c: any) => [c.lon, c.lat]),
+      distance_km: compare.greenest.total_distance_km,
+      duration_min: compare.greenest.total_time_min,
+      carbon_kg: compare.greenest.total_carbon_kg,
+    },
+    standard: {
+      coordinates: compare.fastest.path_coords.map((c: any) => [c.lon, c.lat]),
+      distance_km: compare.fastest.total_distance_km,
+      duration_min: compare.fastest.total_time_min,
+      carbon_kg: compare.fastest.total_carbon_kg,
+    }
+  };
 }
 
 // Fallback: OSRM (single route)
@@ -163,38 +170,26 @@ export default function ComparePage() {
 
   // Compute results reactively whenever vehicle or raw routes change
   const results = useMemo(() => {
-    if (!rawRoutes) return null;
-    
     const vehicleData = VEHICLES.find(v => v.id === selectedVehicle) || VEHICLES[0];
-    const carbonFactor = vehicleData.factor;
-    
-    const ecoDistKm = rawRoutes.eco.distance_km;
-    const stdDistKm = rawRoutes.standard.distance_km;
-    
-    // Vehicle-specific calculations
-    const ecoCarbonKg = ecoDistKm * carbonFactor * (1 - vehicleData.ecoSaving);
-    const ecoTimeMins = (rawRoutes.eco.duration_min * (1 + ECO_DRIVING_TIME_PENALTY)) * (vehicleData.timeFactor || 1);
-    const stdCarbonKg = stdDistKm * carbonFactor * vehicleData.trafficPenalty;
-    const stdTimeMins = rawRoutes.standard.duration_min * (vehicleData.timeFactor || 1);
     
     return {
       eco: {
-        distance: `${ecoDistKm.toFixed(1)} km`,
-        duration: `${ecoTimeMins.toFixed(0)} min`,
-        carbon: `${ecoCarbonKg.toFixed(2)} kg`,
-        carbonVal: ecoCarbonKg,
+        distance: `${rawRoutes.eco.distance_km.toFixed(1)} km`,
+        duration: `${rawRoutes.eco.duration_min.toFixed(0)} min`,
+        carbon: `${rawRoutes.eco.carbon_kg.toFixed(2)} kg`,
+        carbonVal: rawRoutes.eco.carbon_kg,
         isEco: true,
-        isFastest: ecoTimeMins < stdTimeMins,
+        isFastest: rawRoutes.eco.duration_min < rawRoutes.standard.duration_min,
       },
       standard: {
-        distance: `${stdDistKm.toFixed(1)} km`,
-        duration: `${stdTimeMins.toFixed(0)} min`,
-        carbon: `${stdCarbonKg.toFixed(2)} kg`,
-        carbonVal: stdCarbonKg,
+        distance: `${rawRoutes.standard.distance_km.toFixed(1)} km`,
+        duration: `${rawRoutes.standard.duration_min.toFixed(0)} min`,
+        carbon: `${rawRoutes.standard.carbon_kg.toFixed(2)} kg`,
+        carbonVal: rawRoutes.standard.carbon_kg,
         isEco: false,
-        isFastest: stdTimeMins <= ecoTimeMins,
+        isFastest: rawRoutes.standard.duration_min <= rawRoutes.eco.duration_min,
       },
-      totalDistance: ecoDistKm,
+      totalDistance: rawRoutes.eco.distance_km,
       vehicle: vehicleData,
     };
   }, [rawRoutes, selectedVehicle]);
@@ -249,25 +244,11 @@ export default function ComparePage() {
       setOriginCoords(origin);
       setDestCoords(dest);
 
-      // 2. Get two different routes: eco vs standard
-      try {
-        const dualRoutes = await fetchDualRoutes(origin.lat, origin.lon, dest.lat, dest.lon);
-        setRawRoutes(dualRoutes);
-        toast.success("Optimal routes found!");
-      } catch (e) {
-        console.warn('Valhalla dual-route failed, trying OSRM fallback:', e);
-        // Fallback: single OSRM route with simulated difference
-        const route = await fetchOSRMRoute(origin.lat, origin.lon, dest.lat, dest.lon);
-        setRawRoutes({
-          eco: route,
-          standard: {
-            ...route,
-            coordinates: [...route.coordinates],
-            distance_km: route.distance_km * 1.15,
-            duration_min: route.duration_min * 0.92,
-          },
-        });
-      }
+      // 2. Get two different routes using proprietary EcoRoute API
+      const token = await getToken();
+      const routes = await fetchEcoRouteCompare(origin, dest, selectedVehicle, token, API_URL);
+      setRawRoutes(routes);
+      toast.success("EcoRoute optimization complete!");
 
     } catch (err: any) {
       console.error('Route calculation error:', err);

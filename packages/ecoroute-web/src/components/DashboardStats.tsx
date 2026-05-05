@@ -31,7 +31,10 @@ export default function DashboardStats() {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const res = await fetch(fetchUrl, { headers });
+        const res = await fetch(fetchUrl, { 
+            method: 'POST',
+            headers 
+        });
         if (res.ok) {
           const data = await res.json();
           setStats(data);

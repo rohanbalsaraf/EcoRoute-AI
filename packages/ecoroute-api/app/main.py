@@ -60,10 +60,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origin_regex="https://eco-route-ai-.*\\.vercel\\.app",
     allow_origins=[
         "http://localhost:3000",
         "https://eco-route-ai-amber.vercel.app",
-        "https://eco-route-ai-amber-rohanbalsarafs-projects.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -381,7 +381,7 @@ async def compare_routes(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/internal/dashboard/stats", dependencies=[Depends(get_current_user)])
+@app.post("/internal/dashboard/stats", dependencies=[Depends(get_current_user)])
 def get_dashboard_stats(user: UserSchema = Depends(get_current_user), db: Session = Depends(get_db)):
     """Internal endpoint used by the Next.js frontend to show user's API usage."""
     

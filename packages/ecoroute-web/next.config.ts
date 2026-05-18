@@ -10,7 +10,9 @@ export default withSentryConfig(nextConfig, {
   org: "ecoroute",
   project: "web",
   widenClientFileUpload: true,
-  hideSourceMaps: true,
+  sourcemaps: {
+    disable: true,
+  },
   disableLogger: true,
   automaticVercelMonitors: true,
 });

@@ -211,6 +211,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
     return () => {
       map.current?.off('styledata', handleStyleLoad);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedTheme]);
 
   const updateRouteData = (geoms: { eco: [number, number][]; standard: [number, number][] }) => {

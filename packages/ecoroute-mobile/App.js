@@ -142,7 +142,7 @@ function MainApp() {
         try {
           const token = await getToken();
           
-          const statsRes = await fetchWithTimeout(`${API_BASE_URL}/api/v1/profile/limits`, {
+          const statsRes = await fetchWithTimeout(`${API_BASE_URL}/api/v1/user/quota`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (statsRes.ok) {

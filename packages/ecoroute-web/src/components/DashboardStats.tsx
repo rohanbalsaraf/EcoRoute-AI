@@ -18,14 +18,13 @@ export default function DashboardStats() {
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
-  // Use local proxy to bypass ISP blocks and Adblockers
-  const API_URL = "/api/proxy";
+  // Use an opaque local endpoint to bypass aggressive Adblockers parsing URL paths
+  const fetchUrl = "/api/account-stats";
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const token = await getToken();
-        const fetchUrl = `${API_URL}/api/v1/user/quota`;
         const headers: any = { 'Content-Type': 'application/json' };
         if (token && typeof token === 'string' && token.length > 10) {
             headers['Authorization'] = `Bearer ${token}`;
@@ -54,13 +53,13 @@ export default function DashboardStats() {
         }
       } catch (error: any) {
         console.error("Failed to fetch stats:", error);
-        setDebugInfo(`${error.message} | Target: ${API_URL}/api/v1/user/quota`);
+        setDebugInfo(`${error.message} | Target: ${fetchUrl}`);
       } finally {
         setLoading(false);
       }
     };
     fetchStats();
-  }, [getToken, API_URL]);
+  }, [getToken]);
 
   if (loading) {
     return (

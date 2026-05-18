@@ -18,9 +18,9 @@ export default clerkMiddleware(async (auth, request) => {
 
 export const config = {
   matcher: [
-    // Skip Next.js internals, static files, and the proxy API
-    '/((?!_next|api/proxy|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes (except proxy)
-    '/(api(?!/proxy)|trpc)(.*)',
+    // Skip Next.js internals, static files, and the proxy APIs
+    '/((?!_next|api/proxy|api/account-stats|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes (except proxies)
+    '/(api(?!/proxy|/account-stats)|trpc)(.*)',
   ],
 }

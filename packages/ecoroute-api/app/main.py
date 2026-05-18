@@ -60,9 +60,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://eco-route-ai-.*\.vercel\.app|https://.*\.onrender\.com",
+    allow_origin_regex=r"https://.*ecoroute-ai.*\.vercel\.app|https://.*eco-route-ai.*\.vercel\.app|https://.*\.onrender\.com",
     allow_origins=[
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://ecoroute-ai.vercel.app",
         "https://eco-route-ai-amber.vercel.app",
     ],
     allow_credentials=True,

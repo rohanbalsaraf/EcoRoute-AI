@@ -16,8 +16,8 @@ export default function StatusPage() {
   const [data, setData] = useState<ServiceStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const API_URL = rawApiUrl.replace(/\/$/, "");
+  // Use local proxy to bypass ISP blocks and Adblockers
+  const API_URL = "/api/proxy";
 
   useEffect(() => {
     const fetchStatus = async () => {

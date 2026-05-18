@@ -18,8 +18,8 @@ export default function DashboardStats() {
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
-  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const API_URL = rawApiUrl.trim().replace(/\/$/, "");
+  // Use local proxy to bypass ISP blocks and Adblockers
+  const API_URL = "/api/proxy";
 
   useEffect(() => {
     const fetchStats = async () => {

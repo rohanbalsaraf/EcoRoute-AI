@@ -50,7 +50,14 @@ async function handleProxy(request: NextRequest, params: { path: string[] }) {
     }
 
     const res = await fetch(backendUrl, init);
-    return res;
+    
+    // Reconstruct the response to avoid Next.js 500 errors caused by mutating an immutable fetch Response
+    const responseHeaders = new Headers(res.headers);
+    
+    return new NextResponse(res.body, {
+      status: res.status,
+      headers: responseHeaders,
+    });
   } catch (error: any) {
     console.error("Proxy error:", error);
     return NextResponse.json(

@@ -50,16 +50,7 @@ async function handleProxy(request: NextRequest, params: { path: string[] }) {
     }
 
     const res = await fetch(backendUrl, init);
-    const data = await res.text();
-
-    const responseHeaders = new Headers();
-    responseHeaders.set("Content-Type", res.headers.get("Content-Type") || "application/json");
-
-    return new NextResponse(data, {
-      status: res.status,
-      statusText: res.statusText,
-      headers: responseHeaders,
-    });
+    return res;
   } catch (error: any) {
     console.error("Proxy error:", error);
     return NextResponse.json(

@@ -36,9 +36,8 @@ services:
   - type: web
     name: ecoroute-web
     env: node
-    rootDir: packages/ecoroute-web
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter ecoroute-web build
+    startCommand: pnpm --filter ecoroute-web start
     plan: free
     envVars:
       - key: NEXT_PUBLIC_API_URL

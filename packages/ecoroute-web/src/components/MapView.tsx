@@ -111,6 +111,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       map.current = null;
       mapReady.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const injectDarkColors = () => {
@@ -236,6 +237,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       routeGeometries.standard.forEach(c => bounds.extend(c as [number, number]));
       map.current.fitBounds(bounds, { padding: 60, duration: 1500 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeGeometries, originCoords, destCoords]);
 
   // Highlight selected route
@@ -292,6 +294,7 @@ export default function MapView({ isActive, isSearching, routeGeometries, origin
       cancelled = true;
       map.current?.off('moveend', onMoveEnd);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePOIs, routeGeometries]);
 
   const togglePOI = (catId: string) => {

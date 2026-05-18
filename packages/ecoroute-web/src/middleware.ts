@@ -7,7 +7,7 @@ const isPublicRoute = createRouteMatcher([
   '/compare(.*)',
   '/pricing(.*)',
   '/api/checkout(.*)',
-  '/api/proxy(.*)',
+  '/api/gateway(.*)',
 ])
 
 export default clerkMiddleware(async (auth, request) => {
@@ -19,8 +19,8 @@ export default clerkMiddleware(async (auth, request) => {
 export const config = {
   matcher: [
     // Skip Next.js internals, static files, and the proxy APIs
-    '/((?!_next|api/proxy|api/account-stats|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!_next|api/gateway|api/dashboard-profile|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes (except proxies)
-    '/(api(?!/proxy|/account-stats)|trpc)(.*)',
+    '/(api(?!/gateway|/dashboard-profile)|trpc)(.*)',
   ],
 }

@@ -17,7 +17,7 @@ export default function StatusPage() {
   const [loading, setLoading] = useState(true);
 
   // Use local proxy to bypass ISP blocks and Adblockers
-  const API_URL = "/api/proxy";
+  const API_URL = "/api/gateway";
 
   useEffect(() => {
     const fetchStatus = async () => {

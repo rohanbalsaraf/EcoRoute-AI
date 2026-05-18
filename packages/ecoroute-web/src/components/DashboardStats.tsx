@@ -19,7 +19,7 @@ export default function DashboardStats() {
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   // Use an opaque local endpoint to bypass aggressive Adblockers parsing URL paths
-  const fetchUrl = "/api/account-stats";
+  const fetchUrl = "/api/dashboard-profile";
 
   useEffect(() => {
     const fetchStats = async () => {
